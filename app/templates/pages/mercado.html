@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import badge, card, estado_vazio, kpi, variacao %}
+{% from "components/mercado.html" import status_mercado %}
+{% block titulo %}Mercado · MyEdinhos{% endblock %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Mercado</h1>
+    <p class="pagina-descricao">Cotações guardadas no seu computador. Sem internet, o app usa o último dado salvo.</p>
+  </div>
+  <div class="cabecalho-acoes">{{ status_mercado(mercado_status, atualizar_agora) }}</div>
+</header>
+
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {#- Índices do Banco Central (E5-04) -#}
+  <div class="grade">
+    <div class="col-4">{{ kpi("Selic (meta)", (indices.selic_meta|pct(casas=2) ~ " ao ano") if indices.selic_meta is not none else "—", detalhe="Banco Central") }}</div>
+    <div class="col-4">{{ kpi("CDI em 12 meses", indices.cdi_12m|pct(casas=2) if indices.cdi_12m is not none else "—", detalhe="acumulado") }}</div>
+    <div class="col-4">{{ kpi("IPCA em 12 meses", indices.ipca_12m|pct(casas=2) if indices.ipca_12m is not none else "—", detalhe="acumulado") }}</div>
+  </div>
+
+  {#- E5-10: acompanhamento -#}
+  <section class="card">
+    <header class="card-cabecalho">
+      <div>
+        <h2 class="card-titulo">Ativos acompanhados</h2>
+        <p class="card-subtitulo">Os da carteira e os que você só acompanha (cadastre um ativo sem operação).</p>
+      </div>
+      <button type="button" class="botao botao-secundario botao-pequeno" hx-get="/carteira/ativos/novo" hx-target="#drawer-conteudo">{{ icone("plus") }}Acompanhar ativo</button>
+    </header>
+    {% if itens %}
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">Cotações dos ativos acompanhados</caption>
+        <thead>
+          <tr>
+            <th scope="col">Ativo</th>
+            <th scope="col" class="num">Último</th>
+            <th scope="col" class="num">Dia</th>
+            <th scope="col" class="ocultar-celular">30 dias</th>
+            <th scope="col" class="ocultar-celular">Cotação de</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in itens %}
+          <tr>
+            <td>
+              <span class="linha-nome">
+                <span class="marcador slot-{{ item.ativo.classe.cor_slot }}" aria-hidden="true"></span>
+                <a class="link-linha peso-500" href="/carteira/ativos/{{ item.ativo.id }}">{{ item.ativo.ticker }}</a>
+                {%- if item.na_carteira %} <span class="badge">Na carteira</span>{% endif %}
+              </span>
+            </td>
+            <td class="num">{{ item.ultima.fechamento|preco if item.ultima else "—" }}</td>
+            <td class="num">{% if item.variacao is not none %}{{ variacao(item.variacao) }}{% else %}<span class="texto-3">—</span>{% endif %}</td>
+            <td class="ocultar-celular">
+              {%- set pontos = item.pontos_svg() %}
+              {%- if pontos %}
+              <svg class="mini-grafico" viewBox="-2 -2 100 32" width="100" height="32" role="img" aria-label="Fechamentos de {{ item.ativo.ticker }} nos últimos 30 pregões">
+                <polyline points="{{ pontos }}" fill="none" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+              </svg>
+              {%- endif %}
+            </td>
+            <td class="secundario ocultar-celular">{% if item.ultima %}{{ item.ultima.data|data_br }} ({{ item.ultima.fonte }}){% else %}sem cotação{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ estado_vazio("Nenhum ativo de bolsa ou cripto", "Ações, FIIs, ETFs, BDRs e cripto da carteira aparecem aqui com cotação automática.", "trending-up") }}
+    {% endif %}
+  </section>
+
+  {#- E5-05: Tesouro Direto -#}
+  <section class="card">
+    <header class="card-cabecalho">
+      <div>
+        <h2 class="card-titulo">Tesouro Direto</h2>
+        <p class="card-subtitulo">Taxas e preços de resgate do dia{% if titulos %} {{ titulos[0].data_base|data_br }}{% endif %}, dos dados abertos do Tesouro Transparente.</p>
+      </div>
+    </header>
+    {% if titulos %}
+    <details class="grafico-tabela">
+    <summary>{{ icone("table") }}Ver os {{ titulos|length }} títulos à venda</summary>
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">Títulos do Tesouro Direto</caption>
+        <thead>
+          <tr>
+            <th scope="col">Título</th>
+            <th scope="col">Vencimento</th>
+            <th scope="col" class="num">Taxa de compra</th>
+            <th scope="col" class="num ocultar-celular">Preço de compra</th>
+            <th scope="col" class="num">Preço de resgate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for titulo in titulos %}
+          <tr>
+            <td>{{ titulo.tipo }}</td>
+            <td class="secundario">{{ titulo.vencimento|data_br }}</td>
+            <td class="num">{{ titulo.taxa_compra|pct(casas=2) if titulo.taxa_compra else "—" }}</td>
+            <td class="num ocultar-celular">{{ titulo.pu_compra|preco if titulo.pu_compra else "—" }}</td>
+            <td class="num">{{ titulo.pu_venda|preco }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </details>
+    {% else %}
+      {{ estado_vazio("Sem dados do Tesouro ainda", "Eles vêm junto com a próxima atualização das cotações.", "landmark") }}
+    {% endif %}
+  </section>
+
+  {% if mercado_status.erros %}
+  {% call card("Falhas na última atualização") %}
+  <ul class="lista-categorias">
+    {% for nome, erro in mercado_status.erros.items() %}
+    <li>{{ badge("Erro", estado="alerta") }}<span class="nome peso-500">{{ nome }}</span><span class="texto-3 erro-fonte">{{ erro }}</span></li>
+    {% endfor %}
+  </ul>
+  <p class="campo-ajuda assistente-nota">Confira o código do ativo (ex.: ITSA4, MXRF11, BTC). Fundos e outros sem cotação em bolsa: use “Informar cotação” na página do ativo.</p>
+  {% endcall %}
+  {% endif %}
+
+  {% call card("Fontes e atualização") %}
+  <div class="pilha">
+    <form hx-post="/mercado/automatico" hx-trigger="change">
+      <label class="checkbox">
+        <input type="checkbox" name="automatico" value="1"{% if mercado_status.automatico %} checked{% endif %}>
+        <span>Atualizar sozinho uma vez por dia ao abrir Carteira, Proventos ou Mercado</span>
+      </label>
+    </form>
+    <dl class="resumo-lista">
+      <div><dt>brapi (principal)</dt><dd>{% if tem_token %}token configurado · {{ requisicoes|qtd }} de {{ limite_brapi|qtd }} requisições no mês{% else %}sem token: usando só o Yahoo{% endif %}</dd></div>
+      <div><dt>Yahoo (reserva)</dt><dd>não oficial, pode falhar sem aviso</dd></div>
+      <div><dt>Banco Central</dt><dd>Selic, CDI e IPCA</dd></div>
+      <div><dt>Tesouro Transparente</dt><dd>preços e taxas do Tesouro Direto</dd></div>
+    </dl>
+    {% if alerta_brapi %}<p class="aviso">{{ badge("Atenção", estado="atencao") }}<span>Mais de 80% da cota gratuita da brapi usada neste mês. Ao acabar, as cotações vêm do Yahoo.</span></p>{% endif %}
+    {% if not tem_token %}<p class="campo-ajuda">Para usar a brapi (com datas de pagamento dos proventos), crie um token gratuito em brapi.dev e coloque <code>BRAPI_TOKEN=seu_token</code> no arquivo <code>.env</code>; depois reinicie o app.</p>{% endif %}
+  </div>
+  {% endcall %}
+</div>
+{% endblock %}

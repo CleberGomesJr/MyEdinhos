@@ -1,0 +1,31 @@
+{% from "components/ui.html" import campo, campo_moeda, campo_select %}
+<form class="drawer-form" hx-post="/assistente/cartoes/{{ cartao.id }}/parcelamentos" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">Parcelamento em andamento</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    <p class="texto-2">{{ cartao.nome }}</p>
+    {{ campo("Descrição", "descricao", valor=valores.descricao or "", erro=erros.descricao, maxlength=120,
+             autocomplete="off", autofocus=True, placeholder="Ex.: Notebook") }}
+    {{ campo_moeda("Valor de cada parcela", "valor", texto=valores.valor or "", erro=erros.valor) }}
+    <div class="grade-2">
+      {{ campo("Parcela na fatura atual", "parcela_atual", tipo="number", valor=valores.parcela_atual or "",
+               erro=erros.parcela_atual, min=1, max=119) }}
+      {{ campo("Total de parcelas", "parcelas", tipo="number", valor=valores.parcelas or "",
+               erro=erros.parcelas, min=2, max=120) }}
+    </div>
+    {{ campo_select("Categoria", "categoria_id", [("", "Escolha…")] + categorias, valores.categoria_id,
+                    erro=erros.categoria_id) }}
+    <p class="campo-ajuda">
+      Na fatura aparece algo como “Notebook 03/10”: parcela 3 de 10. O app lança as parcelas 4 a 10, uma em cada
+      fatura seguinte. A parcela 3 já está no total da fatura atual que você informou.
+    </p>
+  </div>
+
+  <footer class="drawer-rodape">
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

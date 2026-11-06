@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import badge, estado_vazio %}
+{% block titulo %}Cartões · MyEdinhos{% endblock %}
+
+{% macro situacao(resumo) -%}
+{%- set s = resumo.situacao.value -%}
+{%- if s == "paga" %}{{ badge("Paga", estado="ok") }}
+{%- elif s == "vencida" %}{{ badge("Vencida", estado="critico") }}
+{%- elif s == "fechada" %}{{ badge("Fechada", estado="atencao") }}
+{%- else %}<span class="badge">{{ icone("clock") }}Aberta</span>{% endif %}
+{%- endmacro %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Cartões</h1>
+    <p class="pagina-descricao">Fatura que vence em {{ mes.rotulo }}. As compras contam como gasto no mês em que foram feitas; a conta só é descontada quando a fatura é paga.</p>
+  </div>
+  <button type="button" class="botao botao-primario" hx-get="/cartoes/novo" hx-target="#drawer-conteudo">{{ icone("plus") }}Novo cartão</button>
+</header>
+
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {% if not paineis %}
+  <section class="card">
+    {% call estado_vazio("Nenhum cartão cadastrado", "Cadastre o cartão com o limite e os dias de fechamento e vencimento. As compras passam a cair na fatura certa automaticamente.", "credit-card") %}
+      <button type="button" class="botao botao-primario" hx-get="/cartoes/novo" hx-target="#drawer-conteudo">{{ icone("plus") }}Novo cartão</button>
+    {% endcall %}
+  </section>
+  {% endif %}
+
+  {% for painel in paineis %}
+  {%- set cartao = painel.cartao -%}
+  {%- set resumo = painel.resumo -%}
+  {%- set limite = painel.limite -%}
+  <section class="card pilha" aria-labelledby="cartao-{{ cartao.id }}">
+    <header class="card-cabecalho" style="margin-bottom: 0">
+      <div>
+        <h2 class="card-titulo" id="cartao-{{ cartao.id }}">
+          <button type="button" class="link-linha" hx-get="/cartoes/{{ cartao.id }}/editar" hx-target="#drawer-conteudo"
+                  aria-label="Editar {{ cartao.nome }}">{{ cartao.nome }}</button>
+        </h2>
+        <p class="card-subtitulo">Fecha dia {{ cartao.dia_fechamento }} · vence dia {{ cartao.dia_vencimento }} · paga pela {{ cartao.conta_pagamento.nome }}</p>
+      </div>
+    </header>
+
+    <div class="grade">
+      <div class="col-4">
+        <p class="kpi-rotulo">Fatura de {{ mes.rotulo|lower }}</p>
+        <p class="kpi-valor">{{ resumo.total|brl }}</p>
+        <p class="kpi-rodape">{{ situacao(resumo) }}<span>fecha {{ resumo.fatura.data_fechamento|data_br }} · vence {{ resumo.fatura.data_vencimento|data_br }}</span></p>
+      </div>
+      <div class="col-4">
+        <p class="kpi-rotulo">Falta pagar</p>
+        <p class="kpi-valor">{{ resumo.restante|brl }}</p>
+        <p class="kpi-rodape">
+          {%- if resumo.pago %}<span>{{ resumo.pago|brl }} já pago</span>{% endif %}
+          {%- if resumo.creditos %}<span>{{ resumo.creditos|brl }} em créditos</span>{% endif %}
+        </p>
+      </div>
+      <div class="col-4">
+        <p class="kpi-rotulo">Limite disponível</p>
+        <p class="kpi-valor">{{ limite.disponivel|brl }}</p>
+        <p class="kpi-rodape"><span>de {{ limite.limite|brl }} · {{ limite.faturas_abertas|brl }} em faturas · {{ limite.parcelas_futuras|brl }} em parcelas futuras</span></p>
+      </div>
+    </div>
+
+    <div class="linha">
+      {% if resumo.fatura.id and resumo.restante %}
+      <button type="button" class="botao botao-primario" hx-get="/cartoes/faturas/{{ resumo.fatura.id }}/pagar" hx-target="#drawer-conteudo">{{ icone("check") }}Pagar fatura</button>
+      {% endif %}
+      <a class="botao botao-secundario" href="/lancamentos?mes={{ mes }}&amp;origem=cartao-{{ cartao.id }}">Compras do mês</a>
+    </div>
+
+    {% if painel.compras %}
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">Compras na fatura de {{ mes.rotulo }}</caption>
+        <thead>
+          <tr><th scope="col">Data</th><th scope="col">Descrição</th><th scope="col" class="ocultar-celular">Categoria</th><th scope="col" class="num">Valor</th></tr>
+        </thead>
+        <tbody>
+          {% for item in painel.compras %}
+          <tr>
+            <td class="secundario">{{ item.data.strftime("%d/%m") }}</td>
+            <td>
+              <button type="button" class="link-linha" hx-get="/lancamentos/{{ item.id }}/editar" hx-target="#drawer-conteudo">{{ item.descricao }}</button>
+              {%- if item.parcela_total %}<span class="texto-3"> {{ item.parcela_n }}/{{ item.parcela_total }}</span>{% endif %}
+              {%- if item.retroativo %}<span class="texto-3"> · já paga</span>{% endif %}
+              {%- if item.recorrencia_id %}{{ icone("repeat", "icone-inline") }}<span class="sr-only"> (recorrente)</span>{% endif %}
+            </td>
+            <td class="ocultar-celular">{% if item.categoria %}{{ badge(item.categoria.nome_completo, slot=item.categoria.cor_slot) }}{% endif %}</td>
+            <td class="num">
+              <span class="valor">
+                {%- if item.tipo.value == "entrada" %}<span class="marcador cor-entrada" aria-hidden="true"></span>{{ item.valor_centavos|brl(sinal=True) }}
+                {%- else %}<span class="marcador cor-saida" aria-hidden="true"></span>{{ (-item.valor_centavos)|brl }}{% endif %}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ estado_vazio("Nenhuma compra nesta fatura", "Lance uma saída com “Pagar com: cartão”. Ela entra na fatura pela data e pelo dia de fechamento.", "credit-card") }}
+    {% endif %}
+
+    {% if painel.pagamentos %}
+    <div>
+      <h3 class="campo-rotulo" style="margin-bottom: 8px">Pagamentos desta fatura</h3>
+      <ul class="lista-categorias">
+        {% for pagamento in painel.pagamentos %}
+        <li>
+          {{ icone("check") }}
+          <span class="nome">
+            <button type="button" class="link-linha" hx-get="/cartoes/pagamentos/{{ pagamento.id }}/editar" hx-target="#drawer-conteudo">
+              {{ pagamento.data|data_br }} · {{ pagamento.conta.nome }}</button>
+          </span>
+          <span class="tabular">{{ pagamento.valor_centavos|brl }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if painel.historico %}
+    <details class="grafico-tabela">
+      <summary>{{ icone("table") }}Outras faturas</summary>
+      <div class="tabela-container">
+        <table class="tabela">
+          <thead>
+            <tr><th scope="col">Vencimento</th><th scope="col">Situação</th><th scope="col" class="num">Total</th><th scope="col" class="num">Falta pagar</th></tr>
+          </thead>
+          <tbody>
+            {% for item in painel.historico %}
+            <tr>
+              <td><a class="link-linha" href="/cartoes?mes={{ item.fatura.referencia }}">{{ item.fatura.data_vencimento|data_br }}</a></td>
+              <td>{{ situacao(item) }}</td>
+              <td class="num">{{ item.total|brl }}</td>
+              <td class="num">{{ item.restante|brl }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  {% if arquivados %}
+  <section class="card">
+    <header class="card-cabecalho"><h2 class="card-titulo">Arquivados</h2></header>
+    <ul class="lista-categorias">
+      {% for cartao in arquivados %}
+      <li>
+        <span class="nome secundario">{{ cartao.nome }}</span>
+        <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/cartoes/{{ cartao.id }}/reativar">{{ icone("archive-restore") }}Reativar</button>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

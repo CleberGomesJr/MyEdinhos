@@ -1,0 +1,32 @@
+{#- Status das cotações (E5-07, E5-09) e marcações das telas de investimento. -#}
+
+{% macro status_mercado(status, atualizar_agora) -%}
+<div class="status-mercado">
+  <span class="texto-2">
+    {%- if status.nunca %}Cotações ainda não atualizadas
+    {%- else %}Cotações de {{ status.em|hora_local }}
+      {%- if status.fontes %} ({{ status.fontes.values()|unique|join(", ") }}){% endif %}
+    {%- endif %}
+    {%- if status.erros %} · <a class="link-linha" href="/mercado">{{ status.erros|length }} com erro</a>{% endif %}
+  </span>
+  <button type="button" class="botao botao-secundario botao-pequeno" hx-post="/mercado/atualizar" hx-disabled-elt="this">
+    {{- icone("repeat") }}<span class="so-ocioso">Atualizar</span><span class="so-ocupado">Atualizando…</span></button>
+  {%- if atualizar_agora %}
+  {#- 1× ao dia ao abrir (configurável em Mercado): roda em segundo plano e atualiza a tela. -#}
+  <span hidden hx-post="/mercado/atualizar" hx-trigger="load delay:300ms"></span>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{% macro origem_valor(linha) -%}
+{%- if linha.origem == "estimativa" %}<span class="texto-3" title="Estimativa pelo indexador (sem IR); não é o valor de resgate">estimado</span>
+{%- elif linha.origem == "custo" %}<span class="texto-3" title="Sem cotação: vale o custo até haver uma">pelo custo</span>
+{%- elif linha.cotacao %}<span class="texto-3">{{ linha.cotacao.fechamento|preco }} em {{ linha.cotacao.data.strftime("%d/%m") }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro resultado(valor, pct) -%}
+<span class="valor-resultado {{ 'variacao-boa' if valor > 0 else ('variacao-ruim' if valor < 0 else 'variacao-neutra') }}">
+  <span aria-hidden="true">{{ "▲" if valor > 0 else ("▼" if valor < 0 else "") }}</span>
+  {{- valor|brl(sinal=True) }}{% if pct is not none %} <span class="texto-3">{{ pct|pct(sinal=True) }}</span>{% endif %}
+</span>
+{%- endmacro %}

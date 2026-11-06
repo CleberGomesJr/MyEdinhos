@@ -1,0 +1,15 @@
+{#- Barra gasto/limite com estado (ícone + texto). Uso: {% from "components/orcamento.html" import barra_orcamento %} -#}
+{% from "components/ui.html" import badge %}
+
+{% macro estado_orcamento(linha) -%}
+{%- if linha.estado == "critico" %}{{ badge("Passou " ~ (-linha.restante)|brl, estado="critico") }}
+{%- elif linha.estado == "atencao" %}{{ badge("Perto do limite", estado="atencao") }}
+{%- else %}{{ badge("Dentro do limite", estado="ok") }}{% endif %}
+{%- endmacro %}
+
+{% macro barra_orcamento(linha) -%}
+<div class="barra" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ [linha.percentual, 100]|min|round(0)|int }}"
+     aria-label="{{ linha.categoria.nome }}: {{ linha.percentual|pct(casas=0) }} do limite">
+  <span class="barra-preenchida estado-{{ linha.estado }}" style="width: {{ [linha.percentual, 100]|min|round(1) }}%"></span>
+</div>
+{%- endmacro %}

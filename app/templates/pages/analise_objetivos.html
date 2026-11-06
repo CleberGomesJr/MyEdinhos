@@ -1,0 +1,89 @@
+{% extends "pages/analise_base.html" %}
+{% from "components/ui.html" import badge, card, estado_vazio, kpi %}
+
+{% block acoes %}
+<div class="cabecalho-acoes">
+  <button type="button" class="botao botao-secundario" hx-get="/analise/objetivos/premissas" hx-target="#drawer-conteudo">{{ icone("settings") }}Premissas</button>
+  <button type="button" class="botao botao-primario" hx-get="/analise/objetivos/novo" hx-target="#drawer-conteudo">{{ icone("plus") }}Novo objetivo</button>
+</div>
+{% endblock %}
+
+{% macro progresso(percentual, estado="ok") -%}
+<div class="barra" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ percentual|round|int }}" aria-label="Progresso">
+  <span class="barra-preenchida estado-{{ estado }}" style="width: {{ percentual|round(1) }}%"></span>
+</div>
+{%- endmacro %}
+
+{% macro tempo(meses) -%}
+{%- if meses is none %}mais de 50 anos{% elif meses == 0 %}já atingido{% elif meses < 12 %}{{ meses }} mes{{ "es" if meses > 1 }}{% else %}{{ (meses / 12)|round(1)|string|replace(".", ",") }} anos{% endif %}
+{%- endmacro %}
+
+{% block secao %}
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  <p class="aviso">{{ icone("info") }}<span>Premissas das projeções: retorno de <strong>{{ premissas.retorno_aa|pct }} ao ano</strong>, yield de <strong>{{ premissas.yield_aa|pct }}</strong> e aporte de <strong>{{ premissas.aporte_mensal|brl }} por mês</strong> (sem inflação e sem IR). Ordem de grandeza, não promessa.</span></p>
+
+  <div class="grade">
+    {#- 1º: reserva de emergência -#}
+    <div class="col-6">
+      {% call card("1º Reserva de emergência", reserva.meses ~ " meses de despesa, em renda fixa com liquidez diária") %}
+        {% if reserva.alvo %}
+        <p class="kpi-valor">{{ reserva.atual|brl }} <span class="texto-3 fs-16">de {{ reserva.alvo|brl }}</span></p>
+        {{ progresso(reserva.percentual, "ok" if reserva.completa else "atencao") }}
+        <p class="kpi-rodape cartao-uso-detalhe">
+          {%- if reserva.completa %}{{ badge("Completa", estado="ok") }}<span>os aportes seguem a alocação-alvo</span>
+          {%- else %}{{ badge("Faltam " ~ reserva.falta|brl, estado="atencao") }}<span>{{ tempo((reserva.falta / premissas.aporte_mensal)|round(0, "ceil")|int) if premissas.aporte_mensal else "defina o aporte nas premissas" }}</span>{% endif %}
+        </p>
+        <p class="campo-ajuda assistente-nota">Despesa média: {{ reserva.despesa_media|brl }} por mês (12 meses fechados). Conta como reserva o que você marcar como “reserva de emergência” em Contas e nos ativos de renda fixa.</p>
+        {% else %}
+          {{ estado_vazio("Sem despesas para calcular", "O alvo é " ~ reserva.meses ~ " × a despesa média do mês; aparece quando houver saídas lançadas.", "wallet") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+
+    {#- Renda passiva -#}
+    <div class="col-6">
+      {% call card("Renda passiva com dividendos", "Meta definida em Proventos") %}
+        {% if renda %}
+        <p class="kpi-valor">{{ renda.meta_mensal|brl }} <span class="texto-3 fs-16">por mês</span></p>
+        <dl class="resumo-lista">
+          <div><dt>Média dos últimos 12 meses</dt><dd>{{ renda.media_12m|brl }}</dd></div>
+          <div><dt>Investido em renda variável necessário</dt><dd>{{ renda.patrimonio_rv_necessario|brl }}</dd></div>
+          <div><dt>Patrimônio total ({{ renda.parcela_rv|pct(casas=0) }} em renda variável)</dt><dd>{{ renda.patrimonio_total_necessario|brl }}</dd></div>
+          <div><dt>Hoje</dt><dd>{{ renda.patrimonio_atual|brl }}</dd></div>
+          <div><dt>Tempo estimado</dt><dd class="peso-500">{{ tempo(renda.meses_estimados) }}</dd></div>
+        </dl>
+        <p class="campo-ajuda assistente-nota">Meta × 12 ÷ yield de {{ premissas.yield_aa|pct }}; o patrimônio total divide pela parcela de renda variável da alocação-alvo. Aumentar o aporte é a alavanca mais forte.</p>
+        {% else %}
+          {% call estado_vazio("Sem meta de renda passiva", "Defina quanto quer receber por mês em proventos.", "coins") %}
+            <a class="botao botao-secundario botao-pequeno" href="/proventos">Definir em Proventos</a>
+          {% endcall %}
+        {% endif %}
+      {% endcall %}
+    </div>
+  </div>
+
+  {#- Objetivos com valor e prazo -#}
+  {% call card("Outros objetivos", "Patrimônio de hoje (carteira + reserva): " ~ base|brl) %}
+    {% if itens %}
+    <ul class="lista-objetivos">
+      {% for item in itens %}
+      <li>
+        <div class="barras-linha">
+          <button type="button" class="link-linha barras-nome peso-500" hx-get="/analise/objetivos/{{ item.objetivo.id }}/editar" hx-target="#drawer-conteudo">{{ item.nome }}</button>
+          <span class="tabular">{{ item.alvo|brl }}{% if item.prazo %} <span class="texto-3">até {{ item.prazo.strftime("%m/%Y") }}</span>{% endif %}</span>
+        </div>
+        {{ progresso(item.percentual, "ok" if item.no_prazo != false else "atencao") }}
+        <p class="kpi-rodape cartao-uso-detalhe">
+          <span>{{ item.percentual|pct(casas=0) }} · com {{ item.aporte|brl }}/mês: {{ tempo(item.meses_estimados) }}</span>
+          {%- if item.no_prazo == false %}{{ badge("Para o prazo: " ~ item.aporte_para_prazo|brl ~ "/mês", estado="atencao") }}
+          {%- elif item.no_prazo %}{{ badge("No prazo", estado="ok") }}{% endif %}
+        </p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      {{ estado_vazio("Nenhum outro objetivo", "Ex.: entrada de um imóvel, trocar de carro. Informe o valor e, se quiser, o prazo.", "target") }}
+    {% endif %}
+  {% endcall %}
+</div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% from "components/ui.html" import campo, campo_moeda, campo_select %}
+<form class="drawer-form" hx-post="/lancamentos/recorrencias/{{ regra.id }}" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">Editar recorrência</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    <p class="aviso">{{ icone("repeat") }}{{ regra.frequencia.rotulo }}, desde {{ regra.inicio|data_br }}. As mudanças valem para os lançamentos pendentes de hoje em diante.</p>
+    {{ campo_moeda("Valor", "valor", texto=valores.valor, erro=erros.valor, autofocus=True) }}
+    {{ campo("Descrição", "descricao", valor=valores.descricao, erro=erros.descricao, maxlength=120, autocomplete="off") }}
+    {{ campo_select("Categoria", "categoria_id", categorias, valores.categoria_id, erro=erros.categoria_id) }}
+  </div>
+
+  <footer class="drawer-rodape">
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

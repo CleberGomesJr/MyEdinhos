@@ -1,0 +1,33 @@
+{#- Componentes da Análise (E6). -#}
+{% from "components/ui.html" import badge %}
+
+{% macro alerta_item(alerta) -%}
+<li>
+  {{ badge({"critico": "Crítico", "alerta": "Alerta", "atencao": "Atenção"}[alerta.nivel], estado=alerta.nivel) }}
+  <div class="alerta-texto">
+    <p class="peso-500">
+      {%- if alerta.ativo_id %}<a class="link-linha" href="/carteira/ativos/{{ alerta.ativo_id }}">{{ alerta.titulo }}</a>
+      {%- else %}{{ alerta.titulo }}{% endif %}</p>
+    <p class="texto-3">{{ alerta.detalhe }}</p>
+  </div>
+</li>
+{%- endmacro %}
+
+{#- Barra atual (cor do grupo) com a marca do alvo; o estado vai em texto + ícone. -#}
+{% macro barra_alvo(linha) -%}
+<li>
+  <div class="barras-linha">
+    <span class="marcador slot-{{ linha.grupo.cor_slot }}" aria-hidden="true"></span>
+    <span class="barras-nome">{{ linha.grupo.rotulo }}</span>
+    <span class="tabular">{{ linha.percentual|pct(casas=0) }}</span>
+    {%- if linha.alvo is not none %}<span class="barras-pct tabular" title="Alvo">{{ linha.alvo|pct(casas=0) }}</span>{% endif %}
+  </div>
+  <div class="barra barra-alvo" role="img" aria-label="{{ linha.grupo.rotulo }}: {{ linha.percentual|pct(casas=0) }} da carteira{% if linha.alvo is not none %}, alvo {{ linha.alvo|pct(casas=0) }}{% endif %}">
+    <span class="barra-preenchida slot-{{ linha.grupo.cor_slot }}" style="width: {{ [linha.percentual, 100]|min|round(1) }}%"></span>
+    {%- if linha.alvo is not none %}<span class="marca-alvo" style="left: {{ linha.alvo|round(1) }}%"></span>{% endif %}
+  </div>
+  {%- if linha.estado and linha.estado != "dentro" %}
+  <p class="cartao-uso-detalhe">{{ badge(("Acima" if linha.estado == "acima" else "Abaixo") ~ " do alvo " ~ (linha.desvio|abs)|pp(0)|replace("+", ""), estado="atencao") }}</p>
+  {%- endif %}
+</li>
+{%- endmacro %}

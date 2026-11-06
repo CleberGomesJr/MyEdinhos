@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import badge, card, estado_vazio, grafico, kpi %}
+{% from "components/mercado.html" import origem_valor, resultado, status_mercado %}
+{% block titulo %}{{ ativo.ticker }} · Carteira · MyEdinhos{% endblock %}
+{% block scripts %}
+  <script src="{{ estatico('vendor/chart.umd.js') }}" defer></script>
+  <script src="{{ estatico('js/charts.js') }}" defer></script>
+{% endblock %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <p class="texto-3"><a class="link-linha texto-3" href="/carteira">{{ icone("chevron-left", "icone-inline") }}Carteira</a></p>
+    <h1 class="pagina-titulo">{{ ativo.ticker }}{% if not ativo.ativo %} <span class="badge">Arquivado</span>{% endif %}</h1>
+    <p class="pagina-descricao">
+      {%- if ativo.nome != ativo.ticker %}{{ ativo.nome }} · {% endif %}{{ ativo.classe.rotulo }}
+      {%- if ativo.setor %} · {{ ativo.setor }}{% endif %}
+      {%- if ativo.indexador %} · {{ ativo.indexador.rotulo }}{% if ativo.taxa is not none %} {{ ativo.taxa|qtd }}%{% endif %}{% endif %}
+      {%- if ativo.vencimento %} · vence em {{ ativo.vencimento|data_br }}{% endif %}
+    </p>
+  </div>
+  <div class="cabecalho-acoes">
+    {% if ativo.classe.tem_cotacao %}{{ status_mercado(mercado_status, atualizar_agora) }}{% endif %}
+  </div>
+</header>
+
+<div class="linha" style="margin-bottom: 16px">
+  <button type="button" class="botao botao-primario" hx-get="/carteira/operacoes/nova?ativo_id={{ ativo.id }}" hx-target="#drawer-conteudo">{{ icone("plus") }}Nova operação</button>
+  <button type="button" class="botao botao-secundario" hx-get="/carteira/ativos/{{ ativo.id }}/cotacao" hx-target="#drawer-conteudo">{{ icone("pencil") }}Informar cotação</button>
+  <button type="button" class="botao botao-ghost" hx-get="/carteira/ativos/{{ ativo.id }}/editar" hx-target="#drawer-conteudo">{{ icone("square-pen") }}Editar ativo</button>
+</div>
+
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  <div class="grade">
+    <div class="col-3">{{ kpi("Quantidade", posicao.quantidade|qtd if posicao else "0",
+                              detalhe=("Preço médio " ~ posicao.preco_medio|preco) if posicao and posicao.aberta else "sem posição") }}</div>
+    <div class="col-3">{{ kpi("Custo", (posicao.custo_centavos if posicao else 0)|brl) }}</div>
+    <div class="col-3">
+      <div class="card kpi">
+        <p class="kpi-rotulo"><span class="marcador cor-patrimonio" aria-hidden="true"></span>Valor</p>
+        <p class="kpi-valor">{{ (linha.valor if linha else 0)|brl }}</p>
+        <p class="kpi-rodape">{% if linha %}{{ resultado(linha.resultado, linha.resultado_pct) }}{{ origem_valor(linha) }}{% else %}<span>sem posição</span>{% endif %}</p>
+      </div>
+    </div>
+    <div class="col-3">{{ kpi("Proventos recebidos", (posicao.proventos if posicao else 0)|brl, cor="entrada",
+                              detalhe=((linha.proventos_12m|brl) ~ " em 12 meses" ~ (" · YoC " ~ linha.yield_on_cost|pct if linha.yield_on_cost else "")) if linha else None) }}</div>
+  </div>
+  {% if posicao and posicao.realizado %}
+  <p class="aviso">{{ icone("info") }}<span>Resultado realizado nas vendas: <strong>{{ posicao.realizado|round|int|brl(sinal=True) }}</strong> (pelo preço médio; informativo, não substitui o cálculo de imposto).</span></p>
+  {% endif %}
+
+  {#- E6-11: indicadores de dividendos -#}
+  {% if ind.tem_historico %}
+  {%- set anos = ind.por_ano|dictsort|list %}
+  {%- set recentes = anos[-6:] %}
+  {%- set maior = recentes|map(attribute=1)|max %}
+  {% call card("Dividendos", "Pela fonte de mercado, valor por cota/ação pela data com") %}
+  <div class="grade">
+    <div class="col-3"><p class="kpi-rotulo">Dividend yield (12 meses)</p><p class="kpi-valor">{{ dy|pct if dy else "—" }}</p>
+      <p class="kpi-rodape"><span>{{ ind.por_unidade_12m|preco }} por unidade</span></p></div>
+    <div class="col-3"><p class="kpi-rotulo">Frequência</p><p class="kpi-valor fs-20">{{ ind.frequencia|capitalize }}</p>
+      <p class="kpi-rodape"><span>{{ ind.pagamentos_12m }} pagamento(s) em 12 meses</span></p></div>
+    <div class="col-3"><p class="kpi-rotulo">Anos seguidos pagando</p><p class="kpi-valor">{{ ind.anos_seguidos(ano_atual) }}</p>
+      <p class="kpi-rodape">
+        {%- set cortes = ind.cortes(ano_atual) %}
+        {%- if cortes %}{{ badge("Corte em " ~ cortes|join(", "), estado="atencao") }}{% else %}<span>sem cortes no histórico</span>{% endif %}</p></div>
+    <div class="col-3"><p class="kpi-rotulo">Crescimento médio</p>
+      {%- set cresc = ind.crescimento_anual(ano_atual) %}
+      <p class="kpi-valor">{{ cresc|pct(sinal=True) if cresc is not none else "—" }}</p>
+      <p class="kpi-rodape"><span>{{ "ao ano, por unidade" if cresc is not none else "precisa de 3 anos fechados" }}</span></p></div>
+  </div>
+  <ul class="barras-lista assistente-nota" aria-label="Proventos por unidade em cada ano">
+    {% for ano, valor in recentes %}
+    <li>
+      <div class="barras-linha"><span class="barras-nome tabular">{{ ano }}{% if ano == ano_atual %} <span class="texto-3">(até agora)</span>{% endif %}</span><span class="tabular">{{ valor|preco }}</span></div>
+      <div class="barra" aria-hidden="true"><span class="barra-preenchida cor-entrada" style="width: {{ (valor * 100 / maior)|round(1) if maior else 0 }}%"></span></div>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="campo-ajuda assistente-nota">Corte = ano fechado com menos de 75% do anterior. Payout fica de fora: nenhuma fonte gratuita conferida entrega o lucro por ação de forma confiável — confira no RI da empresa ou do fundo.</p>
+  {% endcall %}
+  {% endif %}
+
+  {% if grafico_cotacao.rotulos|length > 1 %}
+  {% call card("Cotação", "Últimos 12 meses") %}
+    {{ grafico("grafico-cotacao", "linha", grafico_cotacao, "Fechamento de " ~ ativo.ticker ~ " nos últimos 12 meses") }}
+  {% endcall %}
+  {% endif %}
+
+  {% call card("Operações") %}
+    {% if operacoes %}
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">Operações de {{ ativo.ticker }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Data</th><th scope="col">Tipo</th>
+            <th scope="col" class="num ocultar-celular">Quantidade</th>
+            <th scope="col" class="num ocultar-celular">Preço</th>
+            <th scope="col" class="num">Valor</th>
+            <th scope="col" class="ocultar-celular">Conta</th>
+            <th scope="col" class="acoes"><span class="sr-only">Ações</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for op in operacoes %}
+          <tr>
+            <td class="secundario">{{ op.data|data_br }}</td>
+            <td><button type="button" class="link-linha" hx-get="/carteira/operacoes/{{ op.id }}/editar" hx-target="#drawer-conteudo">{{ op.tipo.rotulo }}</button></td>
+            <td class="num ocultar-celular">{{ op.quantidade|qtd if op.quantidade is not none else "—" }}</td>
+            <td class="num secundario ocultar-celular">{{ op.preco_unitario|preco if op.preco_unitario is not none else "—" }}</td>
+            <td class="num">
+              {%- if op.tipo.provento %}<span class="valor"><span class="marcador cor-entrada" aria-hidden="true"></span>{{ op.valor_total_centavos|brl(sinal=True) }}</span>
+              {%- elif op.tipo.value == "desdobramento" %}<span class="secundario">fator {{ op.quantidade|qtd }}</span>
+              {%- else %}{{ op.valor_total_centavos|brl }}{% if op.taxas_centavos %}<div class="celula-detalhe texto-3">taxas {{ op.taxas_centavos|brl }}</div>{% endif %}{% endif %}
+            </td>
+            <td class="secundario ocultar-celular">{{ op.conta.nome if op.conta else "—" }}</td>
+            <td class="acoes">
+              <button type="button" class="botao botao-ghost botao-icone botao-pequeno" hx-delete="/carteira/operacoes/{{ op.id }}"
+                      hx-confirm="Excluir {{ op.tipo.rotulo|lower }} de {{ op.data|data_br }}?" data-confirmar-titulo="Excluir operação" data-confirmar-acao="Excluir"
+                      title="Excluir" aria-label="Excluir {{ op.tipo.rotulo }} de {{ op.data|data_br }}">{{ icone("trash-2") }}</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ estado_vazio("Nenhuma operação", "Registre a posição inicial ou uma compra.", "arrow-left-right") }}
+    {% endif %}
+  {% endcall %}
+
+  {% if anunciados %}
+  {% call card("Proventos divulgados", "Pela fonte de mercado (os mais recentes)") %}
+  <div class="tabela-container">
+    <table class="tabela">
+      <thead><tr><th scope="col">Data com</th><th scope="col">Tipo</th><th scope="col" class="ocultar-celular">Pagamento</th><th scope="col" class="num">Por unidade</th><th scope="col" class="ocultar-celular">Fonte</th></tr></thead>
+      <tbody>
+        {% for anuncio in anunciados %}
+        <tr>
+          <td class="secundario">{{ anuncio.data_com|data_br }}</td>
+          <td>{{ anuncio.tipo.rotulo }}</td>
+          <td class="secundario ocultar-celular">{{ anuncio.data_pagamento|data_br if anuncio.data_pagamento else "—" }}</td>
+          <td class="num">{{ anuncio.valor_por_unidade|preco }}</td>
+          <td class="secundario ocultar-celular">{{ anuncio.fonte }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endcall %}
+  {% endif %}
+</div>
+{% endblock %}

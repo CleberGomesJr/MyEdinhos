@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import campo_select, card, estado_vazio %}
+{% from "components/importacao.html" import amostra_arquivo, aviso_erro, marcar_todas, passos_importacao %}
+{% block titulo %}Importar operações · MyEdinhos{% endblock %}
+
+{% macro ocultos() -%}
+<input type="hidden" name="conteudo" value="{{ conteudo }}">
+{%- endmacro %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Importar operações</h1>
+    <p class="pagina-descricao">CSV da corretora ou da Área do Investidor da B3. Nada entra sem você revisar, e importar o mesmo arquivo de novo não duplica.</p>
+  </div>
+  <div class="cabecalho-acoes"><a class="botao botao-ghost" href="/carteira">{{ icone("chevron-left") }}Carteira</a></div>
+</header>
+
+{{ passos_importacao(passos, indice, "Passos da importação") }}
+
+{% if etapa == "arquivo" %}
+<div id="lista" hx-disinherit="*" hx-get="/carteira/importar" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {{ aviso_erro(erro) }}
+  {% call card("Qual arquivo?", "Negociação ou Movimentação, da B3, ou o histórico da corretora") %}
+    <form method="post" action="/carteira/importar" enctype="multipart/form-data" class="pilha">
+      <div class="campo">
+        <label class="campo-rotulo" for="campo-arquivo">Arquivo .csv (até 5 MB)</label>
+        <input class="entrada" type="file" id="campo-arquivo" name="arquivo" accept=".csv,.txt">
+        <p class="campo-ajuda">Na Área do Investidor (B3): Extratos → Negociação ou Movimentação → baixar. Vem em Excel: abra e use “Salvar como” → CSV. O arquivo é lido só neste computador.</p>
+      </div>
+      <div class="linha"><button type="submit" class="botao botao-primario">Continuar{{ icone("chevron-right") }}</button></div>
+    </form>
+  {% endcall %}
+  {% if ultimo_lote %}
+  <p class="aviso">{{ icone("info") }}<span>A última importação criou {{ ultimo_lote }} operação(ões).
+    <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/carteira/importar/desfazer"
+            hx-confirm="Apagar as {{ ultimo_lote }} operação(ões) da última importação? Os ativos novos continuam cadastrados."
+            data-confirmar-titulo="Desfazer importação" data-confirmar-acao="Apagar">Desfazer</button></span></p>
+  {% endif %}
+</div>
+
+{% elif etapa == "colunas" %}
+<form method="post" action="/carteira/importar/revisar" class="pilha" novalidate>
+  {{ ocultos() }}
+  {{ aviso_erro(erro) }}
+  {% call card("O que é cada coluna?", "Já preenchi o que reconheci. Confira com as primeiras linhas abaixo.") %}
+    <div class="assistente-campos">
+      {{ campo_select("Data", "col_data", colunas, mapa.data) }}
+      {{ campo_select("Ativo", "col_ticker", colunas, mapa.ticker) }}
+      {{ campo_select("Tipo de operação", "col_tipo", colunas, mapa.tipo, ajuda="Compra, venda, dividendo…") }}
+      {{ campo_select("Quantidade", "col_quantidade", colunas, mapa.quantidade) }}
+      {{ campo_select("Preço", "col_preco", colunas, mapa.preco) }}
+      {{ campo_select("Valor total", "col_valor", colunas, mapa.valor) }}
+      {{ campo_select("Taxas", "col_taxas", colunas, mapa.taxas, ajuda="Opcional") }}
+      {{ campo_select("Conta do dinheiro", "conta_id", contas, conta_id, ajuda="Compras tiram dessa conta; vendas e proventos põem nela") }}
+    </div>
+  {% endcall %}
+  {% call card("Primeiras linhas do arquivo") %}
+    {{ amostra_arquivo(tabela, amostra) }}
+  {% endcall %}
+  <footer class="assistente-rodape">
+    <span class="espaco"></span>
+    <a class="botao botao-ghost" href="/carteira/importar">Trocar arquivo</a>
+    <button type="submit" class="botao botao-primario">Revisar{{ icone("chevron-right") }}</button>
+  </footer>
+</form>
+
+{% elif etapa == "revisao" %}
+<form method="post" action="/carteira/importar/confirmar" class="pilha" novalidate>
+  {{ ocultos() }}
+  <input type="hidden" name="conta_id" value="{{ conta_id }}">
+  {% for campo, coluna in mapa.items() %}<input type="hidden" name="col_{{ campo }}" value="{{ coluna }}">
+  {% endfor %}
+  {% call card("Confira antes de importar", marcadas ~ " de " ~ linhas|length ~ " linha(s) marcada(s). As operações entram em ordem de data.") %}
+    <div class="tabela-container">
+      <table class="tabela tabela-importar tabela-importar-operacoes">
+        <caption class="sr-only">Linhas do arquivo</caption>
+        <thead>
+          <tr>
+            <th scope="col" class="coluna-marca">{{ marcar_todas() }}</th>
+            <th scope="col">Data</th>
+            <th scope="col">Ativo</th>
+            <th scope="col">Operação</th>
+            <th scope="col" class="num">Quantidade</th>
+            <th scope="col" class="num">Preço</th>
+            <th scope="col" class="num">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas %}
+          {% set marcada = linha.situacao == "nova" %}
+          <tr{% if not marcada %} class="linha-apagada"{% endif %}>
+            <td class="coluna-marca">
+              {% if linha.importavel %}
+              <label class="checkbox"><input type="checkbox" name="importar-{{ linha.numero }}" value="1"{% if marcada %} checked{% endif %} aria-label="Importar linha {{ linha.numero }}"></label>
+              {% endif %}
+            </td>
+            <td class="secundario">{{ linha.data|data_br if linha.data else "—" }}</td>
+            <td>
+              <span class="peso-500">{{ linha.ticker or "—" }}</span>
+              {%- if linha.ativo_novo %} <span class="badge">Ativo novo</span>{% endif %}
+            </td>
+            <td>
+              {{ linha.tipo.rotulo if linha.tipo else linha.original }}
+              {%- if linha.motivo %}<span class="linha-motivo">{{ linha.motivo }}</span>{% endif %}
+            </td>
+            <td class="num">{{ linha.quantidade|qtd if linha.quantidade is not none else "—" }}</td>
+            <td class="num">{{ linha.preco|preco if linha.preco is not none else "—" }}</td>
+            <td class="num">{{ linha.valor|brl if linha.valor else "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endcall %}
+  <footer class="assistente-rodape">
+    <span class="espaco"></span>
+    <a class="botao botao-ghost" href="/carteira/importar">Trocar arquivo</a>
+    <button type="submit" class="botao botao-primario">Importar marcadas</button>
+  </footer>
+</form>
+
+{% else %}
+<div class="pilha">
+  {% if falhas %}
+  {% call card("Linhas que não entraram", "O restante foi importado") %}
+    <ul class="lista-simples">
+      {% for linha in falhas %}<li>Linha {{ linha.numero }} ({{ linha.ticker }}): {{ linha.motivo }}</li>{% endfor %}
+    </ul>
+  {% endcall %}
+  {% endif %}
+  <section class="card">
+    {% if criadas %}
+      {% call estado_vazio(criadas ~ " operação(ões) importada(s)", "Confira a carteira. Se algo saiu errado, dá para desfazer tudo na tela de importação.", "circle-check") %}
+        <a class="botao botao-primario" href="/carteira">Ver carteira</a>
+        <a class="botao botao-ghost" href="/carteira/importar">Importar outro</a>
+      {% endcall %}
+    {% else %}
+      {% call estado_vazio("Nada importado", "Nenhuma linha estava marcada, ou nenhuma passou nas regras.", "inbox") %}
+        <a class="botao botao-primario" href="/carteira/importar">Importar outro</a>
+      {% endcall %}
+    {% endif %}
+  </section>
+</div>
+{% endif %}
+{% endblock %}

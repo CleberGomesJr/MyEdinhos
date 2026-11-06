@@ -1,0 +1,29 @@
+{% extends "pages/assistente_base.html" %}
+
+{% block passo %}
+<div class="pilha">
+  <form method="post" action="/assistente/carteira" class="pilha" novalidate>
+    <section class="card pilha">
+      <header class="card-cabecalho" style="margin-bottom: 0">
+        <div>
+          <h2 class="card-titulo">Quais investimentos você já tem?</h2>
+          <p class="card-subtitulo">
+            {%- if ativos_na_carteira %}Já há {{ ativos_na_carteira }} ativo(s) na carteira; aqui você acrescenta outros.
+            {%- else %}Ações, FIIs, ETFs e cripto. Renda fixa e fundos podem ser cadastrados depois, em Carteira.{% endif %}
+          </p>
+        </div>
+      </header>
+      {% include "partials/posicao_inicial_campos.html" %}
+    </section>
+    <footer class="assistente-rodape">
+      <a class="botao botao-ghost" href="/assistente/cartoes">{{ icone("chevron-left") }}Voltar</a>
+      <span class="espaco"></span>
+      <button type="submit" class="botao botao-primario">{{ icone("check") }}Registrar e concluir</button>
+    </footer>
+  </form>
+  <form method="post" action="/assistente/concluir" class="assistente-rodape">
+    <span class="espaco"></span>
+    <button type="submit" class="botao botao-ghost">Concluir sem cadastrar investimentos</button>
+  </form>
+</div>
+{% endblock %}

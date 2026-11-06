@@ -1,0 +1,69 @@
+{% from "components/ui.html" import campo, campo_select, segmentado %}
+<form class="drawer-form" hx-post="{{ '/categorias/' ~ categoria.id if categoria else '/categorias' }}" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">{{ "Editar categoria" if categoria else "Nova categoria" }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    {{ campo("Nome", "nome", valor=valores.nome, erro=erros.nome, maxlength=40, autocomplete="off", autofocus=True) }}
+
+    {{ segmentado("Tipo", "tipo", [("saida", "Saída", "saida"), ("entrada", "Entrada", "entrada")], valores.tipo,
+                  erro=erros.tipo, desabilitado=tipo_travado) }}
+    {% if tipo_travado %}<p class="campo-ajuda">O tipo não muda porque a categoria já tem lançamentos.</p>{% endif %}
+
+    {% if not tem_subcategorias %}
+    <div data-mostrar-se="tipo=saida">
+      {{ campo_select("Dentro de", "pai_id", pais_saida, valores.pai_id or request.query_params.get("pai_id", ""),
+                      erro=erros.pai_id, id="pai-saida") }}
+    </div>
+    <div data-mostrar-se="tipo=entrada">
+      {{ campo_select("Dentro de", "pai_id", pais_entrada, valores.pai_id or request.query_params.get("pai_id", ""),
+                      erro=erros.pai_id, id="pai-entrada") }}
+    </div>
+    {% endif %}
+
+    <div data-mostrar-se="pai_id=">
+      <fieldset class="campo segmentado-campo">
+        <legend class="campo-rotulo">Cor nos gráficos</legend>
+        <div class="escolhas">
+          {% for slot in range(1, 9) %}
+          <label class="escolha">
+            <input type="radio" name="cor_slot" value="{{ slot }}"{% if valores.cor_slot|string == slot|string %} checked{% endif %}>
+            <span><span class="marcador slot-{{ slot }}"></span><span class="sr-only">Cor {{ slot }}</span></span>
+          </label>
+          {% endfor %}
+          <label class="escolha">
+            <input type="radio" name="cor_slot" value="0"{% if valores.cor_slot|string == "0" %} checked{% endif %}>
+            <span><span class="marcador slot-0"></span><span class="sr-only">Cinza (outros)</span></span>
+          </label>
+        </div>
+        {% if erros.cor_slot %}<p class="campo-erro">{{ icone("circle-alert") }}{{ erros.cor_slot }}</p>{% endif %}
+      </fieldset>
+    </div>
+
+    <fieldset class="campo segmentado-campo">
+      <legend class="campo-rotulo">Ícone</legend>
+      <div class="escolhas">
+        {% for nome in icones %}
+        <label class="escolha">
+          <input type="radio" name="icone" value="{{ nome }}"{% if valores.icone == nome %} checked{% endif %}>
+          <span>{{ icone(nome) }}<span class="sr-only">{{ nome }}</span></span>
+        </label>
+        {% endfor %}
+      </div>
+      {% if erros.icone %}<p class="campo-erro">{{ icone("circle-alert") }}{{ erros.icone }}</p>{% endif %}
+    </fieldset>
+  </div>
+
+  <footer class="drawer-rodape">
+    {% if categoria %}
+    <button type="button" class="botao botao-ghost" hx-post="/categorias/{{ categoria.id }}/excluir"
+            hx-confirm="Excluir “{{ categoria.nome }}”? Se ela tiver lançamentos ou subcategorias, será arquivada."
+            data-confirmar-titulo="Excluir categoria" data-confirmar-acao="Excluir">{{ icone("trash-2") }}Excluir</button>
+    <span class="espaco"></span>
+    {% endif %}
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

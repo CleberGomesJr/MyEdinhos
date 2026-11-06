@@ -1,0 +1,27 @@
+{% from "components/ui.html" import campo, campo_moeda %}
+<form class="drawer-form" hx-post="{{ '/analise/objetivos/' ~ objetivo.id if objetivo else '/analise/objetivos' }}" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">{{ "Editar objetivo" if objetivo else "Novo objetivo" }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+  <div class="drawer-corpo pilha">
+    {{ campo("Nome", "nome", valor=valores.nome, erro=erros.nome, maxlength=80, autocomplete="off", autofocus=True, placeholder="Ex.: Entrada do apartamento") }}
+    <div class="grade-2">
+      {{ campo_moeda("Valor", "valor_alvo", texto=valores.valor_alvo, erro=erros.valor_alvo) }}
+      {{ campo("Prazo", "prazo", tipo="date", valor=valores.prazo, erro=erros.prazo, ajuda="Opcional.") }}
+    </div>
+    {{ campo_moeda("Aporte mensal para ele", "aporte_mensal", texto=valores.aporte_mensal, erro=erros.aporte_mensal,
+                   ajuda="Opcional. Em branco, usa o aporte das premissas.") }}
+    {{ campo("Observação", "descricao", valor=valores.descricao, erro=erros.descricao, maxlength=500, autocomplete="off") }}
+    <p class="campo-ajuda">O progresso compara com o patrimônio de hoje (carteira + reserva).</p>
+  </div>
+  <footer class="drawer-rodape">
+    {% if objetivo %}
+    <button type="button" class="botao botao-ghost" hx-delete="/analise/objetivos/{{ objetivo.id }}" hx-confirm="Excluir o objetivo “{{ objetivo.nome }}”?"
+            data-confirmar-titulo="Excluir objetivo" data-confirmar-acao="Excluir">{{ icone("trash-2") }}Excluir</button>
+    <span class="espaco"></span>
+    {% endif %}
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

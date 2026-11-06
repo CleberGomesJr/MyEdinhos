@@ -1,0 +1,93 @@
+{% extends "pages/assistente_base.html" %}
+{% from "components/ui.html" import campo_moeda, estado_vazio %}
+
+{% block passo %}
+<form method="post" action="/assistente/cartoes" class="pilha" novalidate>
+  <div id="lista" hx-disinherit="*" hx-get="/assistente/cartoes" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+    {% if not paineis %}
+    <section class="card">
+      {% call estado_vazio("Nenhum cartão cadastrado", "Cadastre o cartão para informar a fatura atual e os parcelamentos. Se você não usa cartão, pule este passo.", "credit-card") %}
+        {% if tem_contas %}
+        <button type="button" class="botao botao-primario" hx-get="/cartoes/novo" hx-target="#drawer-conteudo">{{ icone("plus") }}Novo cartão</button>
+        {% endif %}
+      {% endcall %}
+    </section>
+    {% endif %}
+
+    {% for painel in paineis %}
+    {%- set cartao = painel.cartao -%}
+    <section class="card pilha" aria-labelledby="cartao-{{ cartao.id }}">
+      <header class="card-cabecalho" style="margin-bottom: 0">
+        <div>
+          <h2 class="card-titulo" id="cartao-{{ cartao.id }}">{{ cartao.nome }}</h2>
+          <p class="card-subtitulo">Fecha dia {{ cartao.dia_fechamento }} · vence dia {{ cartao.dia_vencimento }} · paga pela {{ cartao.conta_pagamento.nome }}</p>
+        </div>
+      </header>
+
+      <div>
+        <h3 class="subtitulo-secao">Total das faturas em aberto</h3>
+        <div class="assistente-campos">
+          {% for item in painel.faturas %}
+          {%- set nome = "fatura-" ~ item.fatura.id -%}
+          {%- if item.situacao.value == "aberta" -%}
+            {%- set ajuda = "Aberta · fecha em " ~ item.fatura.data_fechamento|data_br -%}
+          {%- elif item.pago -%}
+            {%- set ajuda = "Fechada em " ~ item.fatura.data_fechamento|data_br ~ " · " ~ item.pago|brl ~ " já pago" -%}
+          {%- else -%}
+            {%- set ajuda = "Fechada em " ~ item.fatura.data_fechamento|data_br -%}
+          {%- endif -%}
+          {{ campo_moeda("Fatura que vence em " ~ item.fatura.data_vencimento|data_br, nome, texto=valores.get(nome, ""),
+                         ajuda=ajuda, erro=erros.get(nome)) }}
+          {% endfor %}
+        </div>
+        <p class="campo-ajuda assistente-nota">
+          Use o total que aparece no app do banco, já com as parcelas que caem nessa fatura. A diferença para o que
+          já está lançado entra como “Compras anteriores ao MyEdinhos” (Outros gastos), sem mexer no saldo da conta.
+          {%- if painel.faturas|length > 1 %} Se a fatura fechada já foi paga, registre o pagamento em Cartões.{% endif %}
+        </p>
+      </div>
+
+      <div id="parcelamentos-{{ cartao.id }}" hx-disinherit="*" hx-get="/assistente/cartoes" hx-trigger="parcelamentos from:body"
+           hx-select="#parcelamentos-{{ cartao.id }}" hx-swap="outerHTML">
+        <h3 class="subtitulo-secao">Parcelamentos em andamento</h3>
+        {% if painel.parcelamentos %}
+        <ul class="lista-categorias">
+          {% for item in painel.parcelamentos %}
+          <li>
+            <span class="nome">{{ item.descricao }}
+              <span class="texto-3">· próxima {{ item.proxima.parcela_n }}/{{ item.total }} em {{ item.proxima.fatura.data_vencimento|data_br }} · falta{{ "m" if item.restantes > 1 }} {{ item.restantes }}</span>
+            </span>
+            <span class="tabular">{{ item.valor|brl }}</span>
+            <button type="button" class="botao botao-ghost botao-icone botao-pequeno" hx-delete="/assistente/parcelamentos/{{ item.proxima.id }}"
+                    hx-confirm="Excluir as {{ item.restantes }} parcela(s) restantes de “{{ item.descricao }}”?"
+                    data-confirmar-titulo="Excluir parcelamento" data-confirmar-acao="Excluir"
+                    aria-label="Excluir parcelamento {{ item.descricao }}">{{ icone("trash-2") }}</button>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="texto-3">Nenhuma parcela para as faturas depois da atual.</p>
+        {% endif %}
+        <div class="linha assistente-nota">
+          <button type="button" class="botao botao-secundario botao-pequeno" hx-get="/assistente/cartoes/{{ cartao.id }}/parcelamentos/novo"
+                  hx-target="#drawer-conteudo">{{ icone("plus") }}Adicionar parcelamento</button>
+        </div>
+      </div>
+    </section>
+    {% endfor %}
+
+    {% if paineis %}
+    <div class="linha">
+      <button type="button" class="botao botao-ghost botao-pequeno" hx-get="/cartoes/novo" hx-target="#drawer-conteudo">{{ icone("plus") }}Outro cartão</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <footer class="assistente-rodape">
+    <a class="botao botao-ghost" href="/assistente/contas">{{ icone("chevron-left") }}Voltar</a>
+    <span class="espaco"></span>
+    <a class="botao botao-ghost" href="/assistente/carteira">Pular</a>
+    <button type="submit" class="botao botao-primario">Salvar e continuar{{ icone("chevron-right") }}</button>
+  </footer>
+</form>
+{% endblock %}

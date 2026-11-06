@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import badge, estado_vazio %}
+{% block titulo %}Recorrências · MyEdinhos{% endblock %}
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Recorrências</h1>
+    <p class="pagina-descricao">Lançamentos que se repetem. Cada ocorrência aparece como pendente no seu mês.</p>
+  </div>
+  <a class="botao botao-secundario" href="/lancamentos">{{ icone("chevron-left") }}Lançamentos</a>
+</header>
+
+<div id="lista" hx-disinherit="*" hx-get="/lancamentos/recorrencias" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML">
+  <section class="card">
+    {% if not regras %}
+      {{ estado_vazio("Nenhuma recorrência",
+                      "Ao criar um lançamento, escolha “Repetir: todo mês” (ou semana, ou ano) para ele aparecer aqui.",
+                      "repeat") }}
+    {% else %}
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">Recorrências</caption>
+        <thead>
+          <tr>
+            <th scope="col">Descrição</th>
+            <th scope="col">Frequência</th>
+            <th scope="col" class="ocultar-celular">Categoria</th>
+            <th scope="col">Próxima</th>
+            <th scope="col" class="num">Valor</th>
+            <th scope="col" class="acoes"><span class="sr-only">Ações</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for regra in regras %}
+          <tr>
+            <td>
+              {%- if regra.ativa %}
+              <button type="button" class="link-linha" hx-get="/lancamentos/recorrencias/{{ regra.id }}/editar"
+                      hx-target="#drawer-conteudo">{{ regra.descricao }}</button>
+              {%- else %}<span class="secundario">{{ regra.descricao }}</span>{% endif %}
+            </td>
+            <td class="secundario">{{ regra.frequencia.rotulo }}</td>
+            <td class="ocultar-celular">{{ badge(regra.categoria.nome_completo, slot=regra.categoria.cor_slot) }}</td>
+            <td class="secundario">
+              {%- if not regra.ativa %}Encerrada em {{ regra.fim|data_br }}
+              {%- elif proxima[regra.id] %}{{ proxima[regra.id]|data_br }}{% else %}—{% endif %}
+            </td>
+            <td class="num">
+              <span class="valor"><span class="marcador {{ 'cor-entrada' if regra.tipo.value == 'entrada' else 'cor-saida' }}" aria-hidden="true"></span>{{ regra.valor_centavos|brl }}</span>
+            </td>
+            <td class="acoes">
+              {%- if regra.ativa %}
+              <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/lancamentos/recorrencias/{{ regra.id }}/encerrar"
+                      hx-confirm="Encerrar “{{ regra.descricao }}” hoje? Os lançamentos pendentes depois de hoje serão removidos; os já lançados ficam."
+                      data-confirmar-titulo="Encerrar recorrência" data-confirmar-acao="Encerrar">Encerrar</button>
+              {%- endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

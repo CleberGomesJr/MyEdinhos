@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-BR"{% if sidebar_recolhida %} class="sidebar-recolhida"{% endif %}>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}MyEdinhos{% endblock %}</title>
+  {#- 422 = formulário com erros: troca o conteúdo para mostrar as mensagens. -#}
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "historyCacheSize": 0, "allowEval": false,
+    "responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true},
+      {"code": "422", "swap": true}, {"code": "[45]..", "swap": false, "error": true}]}'>
+  <link rel="icon" type="image/svg+xml" href="{{ estatico('favicon.svg') }}">
+  <link rel="preload" href="/static/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ estatico('css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ estatico('css/app.css') }}">
+  <script src="{{ estatico('vendor/htmx.min.js') }}" defer></script>
+  <script src="{{ estatico('js/app.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</head>
+<body>
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <a class="marca" href="/" aria-label="MyEdinhos — Visão geral">
+        <span class="marca-logo" aria-hidden="true">ME</span>
+        <span class="marca-nome">MyEdinhos</span>
+      </a>
+
+      <nav aria-label="Menu principal">
+        {% for grupo in navegacao %}
+        <ul class="nav-grupo">
+          {% for item in grupo %}
+          <li>
+            <a class="nav-item" href="{{ item.href }}" data-dica="{{ item.rotulo }}"
+               {%- if item == pagina_atual %} aria-current="page"{% endif %}>
+              {{ icone(item.icone) }}<span class="nav-rotulo">{{ item.rotulo }}</span>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endfor %}
+      </nav>
+
+      <div class="sidebar-rodape so-desktop">
+        <button type="button" class="nav-item" id="recolher-sidebar" aria-controls="sidebar"
+                aria-expanded="{{ 'false' if sidebar_recolhida else 'true' }}" data-dica="Expandir menu">
+          {{ icone("panel-left-close", "icone-recolher") }}{{ icone("panel-left-open", "icone-expandir") }}
+          <span class="nav-rotulo">Recolher menu</span>
+        </button>
+      </div>
+    </aside>
+    <div class="sidebar-fundo" data-fechar-menu></div>
+
+    <div class="principal">
+      <header class="topbar">
+        <button type="button" class="botao botao-ghost botao-icone so-mobile" id="abrir-menu"
+                aria-label="Abrir menu" aria-controls="sidebar" aria-expanded="false">
+          {{ icone("menu") }}
+        </button>
+
+        {% if pagina_atual and pagina_atual.usa_mes %}
+        <nav class="seletor-mes" aria-label="Mês">
+          <a class="botao botao-ghost botao-icone" data-atalho="mes-anterior" aria-keyshortcuts="ArrowLeft"
+             href="{{ request.url.include_query_params(mes=mes.anterior()|string) }}"
+             aria-label="Mês anterior: {{ mes.anterior().rotulo }}">{{ icone("chevron-left") }}</a>
+          <span class="seletor-mes-rotulo">{{ mes.rotulo }}</span>
+          <a class="botao botao-ghost botao-icone" data-atalho="mes-proximo" aria-keyshortcuts="ArrowRight"
+             href="{{ request.url.include_query_params(mes=mes.proxima()|string) }}"
+             aria-label="Próximo mês: {{ mes.proxima().rotulo }}">{{ icone("chevron-right") }}</a>
+        </nav>
+        {% endif %}
+
+        <div class="topbar-acoes">
+          <button type="button" class="busca" id="abrir-paleta" aria-keyshortcuts="Control+K" aria-label="Buscar (Ctrl+K)">
+            {{ icone("search") }}<span class="busca-texto">Buscar</span><kbd>Ctrl K</kbd>
+          </button>
+          <button type="button" class="botao botao-primario" data-atalho="novo" aria-keyshortcuts="N"
+                  hx-get="/lancamentos/novo" hx-target="#drawer-conteudo" aria-label="Novo lançamento (N)">
+            {{ icone("plus") }}<span class="botao-novo-texto">Novo</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="conteudo" id="conteudo" tabindex="-1">
+        {% if modo_demo %}
+        <p class="aviso aviso-demo">{{ icone("info") }}<span><strong>Dados fictícios.</strong> Esta é a demonstração, numa pasta separada; seus dados reais não são usados nem alterados.</span></p>
+        {% endif %}
+        {% block conteudo %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <dialog class="drawer" id="drawer" aria-labelledby="drawer-titulo">
+    <div class="drawer-conteudo" id="drawer-conteudo"></div>
+  </dialog>
+
+  <dialog class="modal" id="confirmacao" aria-labelledby="confirmacao-titulo" aria-describedby="confirmacao-texto">
+    <h2 class="modal-titulo" id="confirmacao-titulo">Confirmar</h2>
+    <p class="modal-texto" id="confirmacao-texto"></p>
+    <div class="modal-acoes">
+      <button type="button" class="botao botao-secundario" value="nao">Cancelar</button>
+      <button type="button" class="botao botao-primario" value="sim" id="confirmacao-ok">Confirmar</button>
+    </div>
+  </dialog>
+
+  <dialog class="paleta" id="paleta" aria-label="Buscar">
+    <div class="paleta-busca">
+      {{ icone("search") }}
+      <input type="text" id="paleta-entrada" placeholder="Ir para…" autocomplete="off"
+             role="combobox" aria-expanded="true" aria-controls="paleta-lista" aria-label="Buscar página">
+    </div>
+    <ul class="paleta-lista" id="paleta-lista" role="listbox" aria-label="Páginas">
+      {% for grupo in navegacao + (so_na_busca,) %}{% for item in grupo %}
+      <li role="presentation">
+        <a class="nav-item" role="option" id="paleta-{{ item.icone }}" href="{{ item.href }}" data-busca="{{ item.rotulo }}">
+          {{ icone(item.icone) }}<span>{{ item.rotulo }}</span>
+        </a>
+      </li>
+      {% endfor %}{% endfor %}
+    </ul>
+    <p class="paleta-vazia" id="paleta-vazia" hidden>Nada encontrado.</p>
+  </dialog>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <template id="modelo-toast">
+    <div class="toast">
+      <span class="toast-icone" data-tipo="ok">{{ icone("circle-check") }}</span>
+      <span class="toast-icone" data-tipo="erro">{{ icone("octagon-alert") }}</span>
+      <span class="toast-icone" data-tipo="info">{{ icone("info") }}</span>
+      <span class="toast-texto"></span>
+      <button type="button" class="botao botao-ghost botao-pequeno toast-desfazer" hidden>{{ icone("undo-2") }}Desfazer</button>
+      <button type="button" class="botao botao-ghost botao-pequeno botao-icone toast-fechar" aria-label="Fechar aviso">{{ icone("x") }}</button>
+    </div>
+  </template>
+
+  <template id="modelo-carregando">
+    <div class="drawer-corpo" role="status" aria-label="Carregando">
+      <span class="skeleton skeleton-titulo"></span>
+      <span class="skeleton"></span><span class="skeleton"></span><span class="skeleton"></span>
+    </div>
+  </template>
+</body>
+</html>

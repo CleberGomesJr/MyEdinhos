@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import badge, card, estado_vazio %}
+{% block titulo %}Configurações · MyEdinhos{% endblock %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Configurações</h1>
+    <p class="pagina-descricao">Seus dados ficam só neste computador. Aqui você guarda, leva e restaura tudo.</p>
+  </div>
+</header>
+
+<div id="lista" hx-disinherit="*" hx-get="/config" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {% if importado %}
+  <p class="aviso">{{ icone("circle-check") }}<span>Dados importados. O banco anterior foi guardado em Backups, como “antes-de-importar”.</span></p>
+  {% endif %}
+
+  <div class="grade">
+    <div class="col-6">
+      {% call card("Exportar tudo", "Um .zip com o banco e uma planilha CSV por tabela") %}
+        <p class="texto-2">Para guardar fora deste computador ou levar para outro. O arquivo tem todos os seus dados financeiros: guarde em lugar seguro.</p>
+        <div class="linha card-rodape"><a class="botao botao-primario" href="/config/exportar.zip" download>{{ icone("arrow-down") }}Baixar .zip</a></div>
+      {% endcall %}
+    </div>
+    <div class="col-6">
+      {% call card("Importar", "Troca TODOS os dados do app pelos do arquivo") %}
+        <form class="pilha" hx-post="/config/importar" hx-encoding="multipart/form-data" hx-target="#erro-importar" hx-swap="innerHTML"
+              hx-confirm="Trocar todos os dados pelos do arquivo? O banco atual fica guardado em Backups."
+              data-confirmar-titulo="Importar dados" data-confirmar-acao="Importar">
+          <div class="campo">
+            <label class="campo-rotulo" for="campo-arquivo">Arquivo .zip exportado ou um .db da pasta de backups</label>
+            <input class="entrada" type="file" id="campo-arquivo" name="arquivo" accept=".zip,.db">
+          </div>
+          <div id="erro-importar" aria-live="polite"></div>
+          <div class="linha"><button type="submit" class="botao botao-secundario">{{ icone("arrow-up") }}Importar</button></div>
+        </form>
+      {% endcall %}
+    </div>
+  </div>
+
+  {% call card("Backups", "Automáticos a cada início do app; ficam os 14 mais recentes") %}
+    {% if backups %}
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">Backups do banco</caption>
+        <thead><tr><th scope="col">Arquivo</th><th scope="col">Quando</th><th scope="col" class="num">Tamanho</th></tr></thead>
+        <tbody>
+          {% for backup in backups[:20] %}
+          <tr>
+            <td>{{ backup.nome }}{% if not backup.automatico %} <span class="badge">guardado</span>{% endif %}</td>
+            <td class="secundario">{{ backup.quando.strftime("%d/%m/%Y %H:%M") }}</td>
+            <td class="num secundario">{{ backup.tamanho }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ estado_vazio("Nenhum backup ainda", "O primeiro é feito na próxima vez que o app iniciar.", "archive") }}
+    {% endif %}
+    <div class="linha card-rodape">
+      <button type="button" class="botao botao-secundario botao-pequeno" hx-post="/config/backup">{{ icone("plus") }}Fazer backup agora</button>
+    </div>
+  {% endcall %}
+
+  {% call card("Sobre os dados") %}
+    <dl class="resumo-lista">
+      <div><dt>Pasta dos dados</dt><dd class="caminho">{{ pasta_dados }}</dd></div>
+      <div><dt>Banco</dt><dd>{{ tamanho_banco }} · versão {{ versao_banco }}</dd></div>
+      <div><dt>Backups</dt><dd class="caminho">{{ pasta_backups }}</dd></div>
+      <div><dt>Logs</dt><dd class="caminho">{{ pasta_logs }}</dd></div>
+      <div><dt>Cotações</dt><dd>{{ "brapi com token, Yahoo de reserva" if tem_token else "Yahoo (sem token da brapi)" }} · <a class="link-linha" href="/mercado">ver em Mercado</a></dd></div>
+      <div><dt>Internet</dt><dd>só para cotações, índices e Tesouro Direto; nada sobre você é enviado</dd></div>
+    </dl>
+    <div class="linha card-rodape"><a class="botao botao-ghost botao-pequeno" href="/assistente">{{ icone("sparkles") }}Cadastro inicial</a></div>
+  {% endcall %}
+</div>
+{% endblock %}

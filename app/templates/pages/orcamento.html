@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import estado_vazio, kpi %}
+{% from "components/orcamento.html" import barra_orcamento, estado_orcamento %}
+{% block titulo %}Orçamento · MyEdinhos{% endblock %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Orçamento</h1>
+    <p class="pagina-descricao">Limite de gasto por categoria em {{ mes.rotulo }}. O limite vale do mês em que foi definido em diante; o gasto conta tudo do mês, inclusive as compras no cartão.</p>
+  </div>
+</header>
+
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {% if total.limite %}
+  <div class="grade">
+    <div class="col-4">{{ kpi("Gasto nas categorias com limite", total.gasto|brl, cor="saida",
+                              detalhe="de " ~ total.limite|brl ~ " · " ~ total.percentual|pct(casas=0)) }}</div>
+    <div class="col-4">{{ kpi("Ainda cabe no orçamento" if total.limite >= total.gasto else "Acima do orçamento",
+                              (total.limite - total.gasto)|abs|brl) }}</div>
+    <div class="col-4">{{ kpi("Categorias acima do limite", estouradas,
+                              detalhe="tudo dentro do limite" if not estouradas else None) }}</div>
+  </div>
+  {% endif %}
+
+  <section class="card">
+    {% if not linhas %}
+      {{ estado_vazio("Nenhuma categoria de saída", "Crie categorias de saída em Categorias para definir limites.", "target") }}
+    {% else %}
+    <div class="tabela-container">
+      <table class="tabela tabela-orcamento">
+        <caption class="sr-only">Orçamento por categoria em {{ mes.rotulo }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Categoria</th>
+            <th scope="col" class="num ocultar-celular">Gasto</th>
+            <th scope="col" class="num ocultar-celular">Limite</th>
+            <th scope="col" class="coluna-barra">Uso</th>
+            <th scope="col" class="acoes"><span class="sr-only">Ações</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas %}
+          <tr>
+            <td>
+              <span class="linha-nome">
+                <span class="marcador slot-{{ linha.categoria.cor_slot }}" aria-hidden="true"></span>
+                <a class="link-linha" href="/lancamentos?mes={{ mes }}&amp;categoria_id={{ linha.categoria.id }}&amp;tipo=saida">{{ linha.categoria.nome }}</a>
+              </span>
+            </td>
+            <td class="num ocultar-celular">{{ linha.gasto|brl }}</td>
+            <td class="num secundario ocultar-celular">{{ linha.limite|brl if linha.limite else "—" }}</td>
+            <td class="coluna-barra">
+              {%- if linha.limite %}
+              <div class="uso-orcamento">
+                {{ barra_orcamento(linha) }}
+                <span class="linha">{{ estado_orcamento(linha) }}<span class="texto-3 tabular ocultar-celular">{{ linha.percentual|pct(casas=0) }}</span></span>
+                <span class="so-celular texto-2 tabular">{{ linha.gasto|brl }} de {{ linha.limite|brl }}</span>
+              </div>
+              {%- else %}
+              <span class="so-celular texto-2 tabular">{{ linha.gasto|brl }} · sem limite</span>
+              {%- endif %}
+            </td>
+            <td class="acoes">
+              {%- set acao = "Editar limite" if linha.limite else "Definir limite" %}
+              <button type="button" class="botao botao-ghost botao-pequeno botao-icone" title="{{ acao }}"
+                      hx-get="/orcamento/{{ linha.categoria.id }}/editar?mes={{ mes }}" hx-target="#drawer-conteudo"
+                      aria-label="{{ acao }} de {{ linha.categoria.nome }}">{{ icone("pencil") if linha.limite else icone("plus") }}</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

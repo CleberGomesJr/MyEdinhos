@@ -1,0 +1,35 @@
+{% extends "pages/analise_base.html" %}
+{% from "components/ui.html" import campo, campo_moeda, campo_select, card %}
+
+{% block acoes %}
+<div class="cabecalho-acoes">
+  <a class="botao botao-secundario" href="/analise/snapshot.md" download>{{ icone("arrow-down") }}Baixar .md</a>
+  <a class="botao botao-ghost" href="/analise/snapshot.json" download>{{ icone("arrow-down") }}Baixar .json</a>
+</div>
+{% endblock %}
+
+{% block secao %}
+<div class="pilha">
+  <p class="aviso">{{ icone("info") }}<span>O app não envia nada a ninguém: você copia e decide onde colar (uma conversa com o Claude, por exemplo). O snapshot tem seus valores — trate como dado pessoal.</span></p>
+
+  {#- E6-08 -#}
+  {% call card("Perguntar sobre um ativo", "Monta a pergunta com seus critérios e anexa o snapshot") %}
+  <form class="grade-3 formulario-pergunta" hx-get="/analise/pergunta" hx-target="#resultado-pergunta" hx-swap="innerHTML">
+    {{ campo("Código do ativo", "ticker", list="ativos-conhecidos", autocomplete="off", placeholder="Ex.: TAEE11") }}
+    <datalist id="ativos-conhecidos">{% for valor, _ in ativos %}<option value="{{ valor }}">{% endfor %}</datalist>
+    {{ campo_select("O que quer fazer", "acao", [("comprar", "Comprar"), ("aportar", "Aportar mais"), ("vender", "Vender"), ("manter", "Manter ou não")], "comprar") }}
+    {{ campo_moeda("Valor (opcional)", "valor", id="campo-valor-pergunta") }}
+    <div class="linha"><button type="submit" class="botao botao-primario">Montar pergunta</button></div>
+  </form>
+  <div id="resultado-pergunta" class="assistente-nota" aria-live="polite"></div>
+  {% endcall %}
+
+  {#- E6-07 -#}
+  {% call card("Snapshot da carteira", "Markdown com carteira, alocação, regras, alertas, objetivos e índices — com data e fonte das cotações") %}
+  <div class="pilha">
+    <textarea class="entrada entrada-lote" id="texto-snapshot" rows="18" readonly>{{ texto }}</textarea>
+    <div class="linha"><button type="button" class="botao botao-primario" data-copiar="#texto-snapshot">{{ icone("check") }}Copiar snapshot</button></div>
+  </div>
+  {% endcall %}
+</div>
+{% endblock %}

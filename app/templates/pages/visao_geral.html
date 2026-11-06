@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import alternar_visao, badge, card, estado_vazio, grafico, kpi %}
+{% from "components/orcamento.html" import barra_orcamento, estado_orcamento %}
+{% block titulo %}Visão geral · MyEdinhos{% endblock %}
+{% block scripts %}
+  <script src="{{ estatico('vendor/chart.umd.js') }}" defer></script>
+  <script src="{{ estatico('js/charts.js') }}" defer></script>
+{% endblock %}
+
+{% macro valor_lancamento(item) -%}
+<span class="valor">
+  {%- if item.tipo.value == "transferencia" %}<span class="marcador" aria-hidden="true"></span>{{ item.valor_centavos|brl }}
+  {%- elif item.tipo.value == "entrada" %}<span class="marcador cor-entrada" aria-hidden="true"></span>{{ item.valor_centavos|brl(sinal=True) }}
+  {%- else %}<span class="marcador cor-saida" aria-hidden="true"></span>{{ (-item.valor_centavos)|brl }}{% endif %}
+</span>
+{%- endmacro %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Visão geral</h1>
+    <p class="pagina-descricao">{{ mes.rotulo }} · {{ "por caixa: o que entrou e saiu das contas" if caixa else "por competência: compras no cartão no mês em que foram feitas" }}</p>
+  </div>
+  {{ alternar_visao(caixa) }}
+</header>
+
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {% if assistente_pendente %}
+  <section class="card convite" id="convite-assistente" aria-labelledby="convite-titulo">
+    {{ icone("sparkles") }}
+    <div class="convite-texto">
+      <h2 class="card-titulo" id="convite-titulo">Comece pelo cadastro inicial</h2>
+      <p class="texto-2">Informe o saldo das contas, o total das faturas do cartão e os parcelamentos em andamento. Em poucos minutos o app fica com os números de hoje, sem lançar o histórico.</p>
+    </div>
+    <div class="linha">
+      <button type="button" class="botao botao-ghost" hx-post="/assistente/dispensar" hx-target="#convite-assistente" hx-swap="delete">Agora não</button>
+      <a class="botao botao-primario" href="/assistente">Começar</a>
+    </div>
+  </section>
+  {% endif %}
+
+  {#- E3-02: KPIs. Entradas, saídas e resultado por competência; saldo por caixa. -#}
+  <div class="grade">
+    <div class="col-3">
+      {%- if saldo.futuro %}
+        {{ kpi("Saldo previsto em " ~ mes.ultimo_dia.strftime("%d/%m"), saldo.valor|brl, cor="patrimonio",
+               detalhe="com pendentes e faturas") }}
+      {%- else %}
+        {{ kpi("Saldo hoje" if saldo.atual else "Saldo em " ~ saldo.referencia.strftime("%d/%m"), saldo.valor|brl,
+               cor="patrimonio", variacao_pct=saldo.variacao,
+               detalhe=(saldo.faturas|brl ~ " em faturas a pagar") if saldo.faturas else "vs. fim de " ~ anterior.rotulo_curto) }}
+      {%- endif %}
+    </div>
+    <div class="col-3">{{ kpi("Entradas", resultado.entradas|brl, cor="entrada", variacao_pct=variacao_entradas,
+                              detalhe="vs. " ~ anterior.rotulo_curto) }}</div>
+    <div class="col-3">{{ kpi("Saídas", resultado.saidas|brl, cor="saida", variacao_pct=variacao_saidas, bom_quando="baixa",
+                              detalhe="vs. " ~ anterior.rotulo_curto) }}</div>
+    <div class="col-3">{{ kpi("Resultado do mês", resultado.saldo|brl(sinal=True),
+                              detalhe=("Taxa de poupança " ~ resultado.taxa_poupanca|pct) if resultado.taxa_poupanca is not none else "Sem entradas no mês") }}</div>
+  </div>
+
+  <div class="grade">
+    {#- E3-03: entradas × saídas em 12 meses -#}
+    <div class="col-8">
+      {% call card("Entradas e saídas", "12 meses até " ~ mes.rotulo_curto ~ (" · caixa" if caixa else " · competência")) %}
+        {% if tem_fluxo %}
+          {{ grafico("grafico-fluxo", "barras", fluxo, "Entradas e saídas nos 12 meses até " ~ mes.rotulo) }}
+        {% else %}
+          {{ estado_vazio("Sem lançamentos nesses meses", "Lance entradas e saídas para ver o fluxo mês a mês.", "chart-line") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+
+    {#- E3-04: despesas por categoria -#}
+    <div class="col-4">
+      {% call card("Despesas por categoria", mes.rotulo ~ (" · caixa" if caixa else "")) %}
+        {% if categorias %}
+        <ul class="barras-lista" aria-label="Despesas por categoria em {{ mes.rotulo }}">
+          {% for fatia in categorias %}
+          <li>
+            <div class="barras-linha">
+              <span class="marcador slot-{{ fatia.slot }}" aria-hidden="true"></span>
+              {%- if fatia.categoria_id %}
+              <a class="link-linha barras-nome" href="/lancamentos?mes={{ mes }}&amp;categoria_id={{ fatia.categoria_id }}&amp;tipo=saida">{{ fatia.nome }}</a>
+              {%- else %}
+              <span class="barras-nome">{{ fatia.nome }}</span>
+              {%- endif %}
+              <span class="tabular">{{ fatia.valor|brl }}</span>
+              <span class="barras-pct tabular">{{ fatia.percentual|pct(casas=0) }}</span>
+            </div>
+            <div class="barra" aria-hidden="true"><span class="barra-preenchida slot-{{ fatia.slot }}" style="width: {{ fatia.percentual|round(1) }}%"></span></div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          {{ estado_vazio("Nenhuma saída em " ~ mes.rotulo|lower, "As despesas do mês aparecem aqui, agrupadas pela categoria principal.", "chart-pie") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+  </div>
+
+  <div class="grade">
+    {#- E3-05: evolução do saldo -#}
+    <div class="col-8">
+      <section class="card">
+        <header class="card-cabecalho">
+          <div>
+            <h2 class="card-titulo">Evolução do saldo</h2>
+            <p class="card-subtitulo">Soma das contas, só o que já foi pago</p>
+          </div>
+        </header>
+        {% if tem_saldo %}
+        <div class="alternar">
+          <div class="segmentado segmentado-pequeno" role="radiogroup" aria-label="Período do gráfico">
+            <input type="radio" class="sr-only" name="periodo-saldo" id="saldo-12m" checked>
+            <label for="saldo-12m">12 meses</label>
+            <input type="radio" class="sr-only" name="periodo-saldo" id="saldo-mes"{% if not saldo_diario.rotulos %} disabled{% endif %}>
+            <label for="saldo-mes">No mês</label>
+          </div>
+          <div class="alternar-painel painel-12m">
+            {{ grafico("grafico-saldo-mensal", "linha", saldo_mensal, "Saldo no fim de cada mês, 12 meses até " ~ mes.rotulo) }}
+          </div>
+          <div class="alternar-painel painel-mes">
+            {% if saldo_diario.rotulos %}
+            {{ grafico("grafico-saldo-diario", "linha", saldo_diario, "Saldo ao fim de cada dia de " ~ mes.rotulo) }}
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+          {{ estado_vazio("Sem saldo para mostrar", "Cadastre uma conta com o saldo de hoje (Contas ou Cadastro inicial).", "wallet") }}
+        {% endif %}
+      </section>
+    </div>
+
+    {#- E3-06: saldos por conta; E3-07: orçamento -#}
+    <div class="col-4 pilha">
+      {% call card("Saldos por conta", "Hoje" if saldo.atual else "Em " ~ saldo.referencia.strftime("%d/%m/%Y")) %}
+        {% if contas %}
+        <ul class="barras-lista" aria-label="Saldo de cada conta">
+          {% for item in contas %}
+          <li>
+            <div class="barras-linha">
+              <a class="link-linha barras-nome" href="/lancamentos?mes={{ mes }}&amp;origem=conta-{{ item.conta.id }}">{{ item.conta.nome }}</a>
+              <span class="tabular">{{ item.saldo|brl }}</span>
+            </div>
+            <div class="barra" aria-hidden="true"><span class="barra-preenchida {{ 'cor-saida' if item.saldo < 0 else 'cor-patrimonio' }}" style="width: {{ item.proporcao|round(1) }}%"></span></div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          {{ estado_vazio("Nenhuma conta ativa", None, "wallet") }}
+        {% endif %}
+      {% endcall %}
+
+      {% call card("Orçamento", mes.rotulo) %}
+        {% if orcamento %}
+        <ul class="barras-lista" aria-label="Uso do orçamento por categoria">
+          {% for linha in orcamento %}
+          <li>
+            <div class="barras-linha">
+              <span class="marcador slot-{{ linha.categoria.cor_slot }}" aria-hidden="true"></span>
+              <span class="barras-nome">{{ linha.categoria.nome }}</span>
+              <span class="tabular texto-2">{{ linha.gasto|brl }} <span class="texto-3">de {{ linha.limite|brl }}</span></span>
+            </div>
+            {{ barra_orcamento(linha) }}
+            {%- if linha.estado != "ok" %}<p class="cartao-uso-detalhe">{{ estado_orcamento(linha) }}</p>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="linha card-rodape"><a class="botao botao-ghost botao-pequeno" href="/orcamento?mes={{ mes }}">Ver orçamento{{ icone("chevron-right") }}</a></div>
+        {% else %}
+          {% call estado_vazio("Sem limites definidos", "Defina quanto quer gastar por categoria e acompanhe aqui.", "target") %}
+            <a class="botao botao-secundario botao-pequeno" href="/orcamento?mes={{ mes }}">Definir limites</a>
+          {% endcall %}
+        {% endif %}
+      {% endcall %}
+    </div>
+  </div>
+
+  <div class="grade">
+    {#- E3-08: a pagar nos próximos 7 dias -#}
+    <div class="col-6">
+      {% call card("A pagar", "Atrasados e o que vence até " ~ ate_7_dias.strftime("%d/%m")) %}
+        {% if a_pagar %}
+        <ul class="lista-categorias lista-a-pagar">
+          {% for item in a_pagar %}
+          <li>
+            {%- if item.atrasado %}{{ badge("Atrasado", estado="critico") }}
+            {%- else %}<span class="badge">{{ icone("clock") }}{{ "Hoje" if item.vencimento == hoje else item.vencimento.strftime("%d/%m") }}</span>{% endif %}
+            <span class="nome">
+              {%- if item.lancamento %}
+              <button type="button" class="link-linha" hx-get="/lancamentos/{{ item.lancamento.id }}/editar" hx-target="#drawer-conteudo">{{ item.descricao }}</button>
+              {%- else %}{{ icone("credit-card", "icone-inline") }} {{ item.descricao }}{% endif %}
+            </span>
+            <span class="tabular">{{ item.valor|brl }}</span>
+            {%- if item.lancamento %}
+            <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/lancamentos/{{ item.lancamento.id }}/pagar"
+                    aria-label="Marcar {{ item.descricao }} como pago">{{ icone("check") }}Pagar</button>
+            {%- else %}
+            <button type="button" class="botao botao-ghost botao-pequeno" hx-get="/cartoes/faturas/{{ item.fatura_id }}/pagar" hx-target="#drawer-conteudo"
+                    aria-label="Pagar {{ item.descricao }}">{{ icone("check") }}Pagar</button>
+            {%- endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          {{ estado_vazio("Nada a pagar nos próximos 7 dias", "Contas pendentes e faturas fechadas aparecem aqui antes de vencer.", "circle-check") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+
+    {#- E3-08: últimos lançamentos -#}
+    <div class="col-6">
+      {% call card("Últimos lançamentos") %}
+        {% if ultimos %}
+        <ul class="lista-categorias">
+          {% for item in ultimos %}
+          <li>
+            <span class="texto-3 tabular">{{ item.data.strftime("%d/%m") }}</span>
+            <span class="nome">
+              <button type="button" class="link-linha" hx-target="#drawer-conteudo"
+                      hx-get="{{ '/cartoes/pagamentos/' ~ item.id ~ '/editar' if item.pagamento_de_fatura else '/lancamentos/' ~ item.id ~ '/editar' }}">{{ item.descricao }}</button>
+              {%- if item.parcela_total %}<span class="texto-3"> {{ item.parcela_n }}/{{ item.parcela_total }}</span>{% endif %}
+            </span>
+            {{ valor_lancamento(item) }}
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="linha card-rodape"><a class="botao botao-ghost botao-pequeno" href="/lancamentos?mes={{ mes }}">Ver lançamentos{{ icone("chevron-right") }}</a></div>
+        {% else %}
+          {% call estado_vazio("Nenhum lançamento ainda", "Use o botão Novo (ou a tecla N) para lançar uma entrada ou saída.", "arrow-left-right") %}{% endcall %}
+        {% endif %}
+      {% endcall %}
+    </div>
+  </div>
+
+  {#- E3-13: cartões -#}
+  {% if cartoes %}
+  {% call card("Cartões", "Fatura aberta e uso do limite") %}
+  <div class="grade">
+    {% for uso in cartoes %}
+    <div class="col-6 cartao-uso">
+      <div class="barras-linha">
+        <a class="link-linha barras-nome" href="/cartoes?mes={{ uso.fatura.fatura.referencia }}">{{ uso.cartao.nome }}</a>
+        <span class="tabular">{{ uso.fatura.total|brl }}</span>
+      </div>
+      <p class="texto-3 cartao-uso-detalhe">Fatura aberta · fecha {{ uso.fatura.fatura.data_fechamento.strftime("%d/%m") }} · vence {{ uso.fatura.fatura.data_vencimento.strftime("%d/%m") }}</p>
+      <div class="barra" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ uso.percentual|round(0)|int }}"
+           aria-label="Uso do limite de {{ uso.cartao.nome }}"><span class="barra-preenchida estado-{{ uso.estado }}" style="width: {{ [uso.percentual, 100]|min|round(1) }}%"></span></div>
+      <p class="kpi-rodape cartao-uso-detalhe">
+        {%- if uso.estado == "critico" %}{{ badge("Limite quase no fim", estado="critico") }}
+        {%- elif uso.estado == "atencao" %}{{ badge("Atenção ao limite", estado="atencao") }}
+        {%- else %}{{ badge("Limite ok", estado="ok") }}{% endif %}
+        <span>{{ uso.percentual|pct(casas=0) }} usado · {{ uso.limite.disponivel|brl }} disponível de {{ uso.limite.limite|brl }}</span>
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endcall %}
+  {% endif %}
+</div>
+{% endblock %}

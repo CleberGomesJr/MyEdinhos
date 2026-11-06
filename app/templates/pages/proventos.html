@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import badge, card, estado_vazio, grafico, kpi %}
+{% from "components/mercado.html" import status_mercado %}
+{% block titulo %}Proventos · MyEdinhos{% endblock %}
+{% block scripts %}
+  <script src="{{ estatico('vendor/chart.umd.js') }}" defer></script>
+  <script src="{{ estatico('js/charts.js') }}" defer></script>
+{% endblock %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Proventos</h1>
+    <p class="pagina-descricao">Dividendos, JCP e rendimentos: o que entrou, o que vem aí e quanto falta para a sua meta.</p>
+  </div>
+  <div class="cabecalho-acoes">{{ status_mercado(mercado_status, atualizar_agora) }}</div>
+</header>
+
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {%- set total_mes = recebidos_mes|sum(attribute="valor_total_centavos") %}
+  <div class="grade">
+    <div class="col-3">{{ kpi("Recebido em " ~ mes.rotulo|lower, total_mes|brl, cor="entrada",
+                              detalhe=(recebidos_mes|length ~ " pagamento(s)") if recebidos_mes else "nada lançado no mês") }}</div>
+    <div class="col-3">{{ kpi("Últimos 12 meses", cart.proventos_12m|brl, cor="entrada",
+                              detalhe="média de " ~ (cart.proventos_12m // 12)|brl ~ " por mês") }}</div>
+    <div class="col-3">{{ kpi("Yield on cost", cart.yield_on_cost|pct if cart.yield_on_cost is not none else "—",
+                              detalhe="proventos de 12 meses ÷ custo da carteira") }}</div>
+    {#- E4-13: meta de renda passiva -#}
+    <div class="col-3">
+      <div class="card kpi">
+        <p class="kpi-rotulo">{{ icone("target", "icone-inline") }}Meta de renda passiva</p>
+        {% if meta %}
+        <p class="kpi-valor">{{ meta.percentual|pct(casas=0) }}</p>
+        <div class="barra" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ [meta.percentual, 100]|min|round|int }}" aria-label="Meta atingida">
+          <span class="barra-preenchida cor-entrada" style="width: {{ [meta.percentual, 100]|min|round(1) }}%"></span>
+        </div>
+        <p class="kpi-rodape">
+          <span>{{ meta.media_12m|brl }} de {{ meta.mensal|brl }}/mês</span>
+          <button type="button" class="link-linha texto-3" hx-get="/proventos/meta" hx-target="#drawer-conteudo">Editar</button>
+        </p>
+        {% else %}
+        <p class="kpi-rodape" style="margin-top: 10px">
+          <button type="button" class="botao botao-secundario botao-pequeno" hx-get="/proventos/meta" hx-target="#drawer-conteudo">{{ icone("plus") }}Definir meta</button>
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if meta and meta.falta_mensal %}
+  <p class="aviso">{{ icone("info") }}
+    <span>Faltam <strong>{{ meta.falta_mensal|brl }} por mês</strong> (média de 12 meses).
+    {%- if meta.aporte_necessario %} Mantendo o yield on cost atual ({{ meta.yield_on_cost|pct }} ao ano), seria preciso investir mais cerca de <strong>{{ meta.aporte_necessario|brl }}</strong>. Projeção simples: supõe que o yield se mantém — não é garantia.{% endif %}</span>
+  </p>
+  {% elif meta %}
+  <p class="aviso">{{ icone("circle-check") }}<span>A média dos últimos 12 meses já cobre a meta.</span></p>
+  {% endif %}
+
+  {#- E5-12: sugestões (nada é lançado sozinho) -#}
+  {% if sugestoes %}
+  {% call card("Proventos para confirmar", "Divulgados pela fonte de mercado para quem tinha o ativo na data com. Confira o valor no extrato da corretora antes de lançar.") %}
+  <ul class="lista-categorias">
+    {% for item in sugestoes %}
+    {%- set a = item.anuncio %}
+    <li>
+      <span class="badge">{{ a.tipo.rotulo }}</span>
+      <span class="nome">
+        <a class="link-linha peso-500" href="/carteira/ativos/{{ a.ativo_id }}">{{ a.ativo.ticker }}</a>
+        <span class="texto-3"> · {{ item.quantidade|qtd }} × {{ a.valor_por_unidade|preco }} · data com {{ a.data_com.strftime("%d/%m/%y") }}{% if a.data_pagamento %} · pago {{ a.data_pagamento.strftime("%d/%m/%y") }}{% endif %}</span>
+      </span>
+      <span class="tabular">{{ item.valor|brl }}</span>
+      <button type="button" class="botao botao-secundario botao-pequeno" hx-target="#drawer-conteudo"
+              hx-get="/carteira/operacoes/nova?ativo_id={{ a.ativo_id }}&amp;tipo={{ a.tipo.value }}&amp;data={{ item.data_referencia.isoformat() }}&amp;valor={{ item.valor|valor_br }}&amp;quantidade={{ item.quantidade|qtd }}&amp;anuncio_id={{ a.id }}">{{ icone("check") }}Lançar</button>
+      <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/proventos/anunciados/{{ a.id }}/ignorar" title="Não recebi ou não quero lançar">Ignorar</button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endcall %}
+  {% endif %}
+
+  <div class="grade">
+    <div class="col-8">
+      {% call card("Proventos por mês", "12 meses até " ~ mes.rotulo_curto) %}
+        {% if tem_proventos %}
+          {{ grafico("grafico-proventos-mes", "barras", grafico_mes, "Proventos recebidos por mês") }}
+        {% else %}
+          {{ estado_vazio("Nenhum provento lançado", "Lance dividendos, JCP e rendimentos como operação (Carteira → Nova operação) ou confirme as sugestões acima.", "coins") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+    <div class="col-4">
+      {% call card("Por classe", "Últimos 12 meses") %}
+        {% if por_classe %}
+        <ul class="barras-lista" aria-label="Proventos por classe">
+          {% for item in por_classe %}
+          <li>
+            <div class="barras-linha">
+              <span class="marcador slot-{{ item.slot }}" aria-hidden="true"></span>
+              <span class="barras-nome">{{ item.nome }}</span>
+              <span class="tabular">{{ item.valor|brl }}</span>
+              <span class="barras-pct tabular">{{ item.percentual|pct(casas=0) }}</span>
+            </div>
+            <div class="barra" aria-hidden="true"><span class="barra-preenchida slot-{{ item.slot }}" style="width: {{ item.percentual|round(1) }}%"></span></div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          {{ estado_vazio("Sem proventos no período", None, "coins") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+  </div>
+
+  <div class="grade">
+    {#- E4-10: calendário do que vem -#}
+    <div class="col-6">
+      {% call card("A receber", "Divulgados, para a sua posição; valores estimados") %}
+        {% if a_receber %}
+        <ul class="lista-categorias">
+          {% for item in a_receber %}
+          {%- set a = item.anuncio %}
+          <li>
+            <span class="badge">{{ icone("calendar") }}{{ item.data_referencia.strftime("%d/%m") }}</span>
+            <span class="nome">{{ a.ativo.ticker }} <span class="texto-3">· {{ a.tipo.rotulo }}{% if not a.data_pagamento %} · data com {{ a.data_com.strftime("%d/%m") }}, pagamento a definir{% endif %}</span></span>
+            <span class="tabular">{{ item.valor|brl }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          {{ estado_vazio("Nada divulgado a receber", "Os anúncios vêm com a atualização de cotações. Pela brapi vêm com data de pagamento; pelo Yahoo, só os já pagos.", "calendar") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+    {#- E4-14: ranking -#}
+    <div class="col-6">
+      {% call card("Quem mais pagou", "Últimos 12 meses") %}
+        {% if ranking %}
+        <ul class="barras-lista" aria-label="Ativos que mais pagaram">
+          {% for item in ranking %}
+          <li>
+            <div class="barras-linha">
+              <span class="marcador slot-{{ item.slot }}" aria-hidden="true"></span>
+              {%- if item.ativo %}<a class="link-linha barras-nome" href="/carteira/ativos/{{ item.ativo.id }}">{{ item.nome }}</a>
+              {%- else %}<span class="barras-nome">{{ item.nome }}</span>{% endif %}
+              <span class="tabular">{{ item.valor|brl }}</span>
+              <span class="barras-pct tabular">{{ item.percentual|pct(casas=0) }}</span>
+            </div>
+            <div class="barra" aria-hidden="true"><span class="barra-preenchida slot-{{ item.slot }}" style="width: {{ item.percentual|round(1) }}%"></span></div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          {{ estado_vazio("Sem proventos no período", None, "coins") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+  </div>
+
+  {% if rendimentos %}
+  {% call card("Rendimento por ativo", "YoC = proventos de 12 meses ÷ custo · DY = proventos por unidade em 12 meses ÷ cotação de hoje") %}
+  <div class="tabela-container">
+    <table class="tabela">
+      <thead><tr><th scope="col">Ativo</th><th scope="col" class="num">Recebido em 12 meses</th><th scope="col" class="num">Yield on cost</th><th scope="col" class="num">Dividend yield</th></tr></thead>
+      <tbody>
+        {% for linha, dy in rendimentos %}
+        <tr>
+          <td><span class="linha-nome"><span class="marcador slot-{{ linha.ativo.classe.cor_slot }}" aria-hidden="true"></span><a class="link-linha" href="/carteira/ativos/{{ linha.ativo.id }}">{{ linha.ativo.ticker }}</a></span></td>
+          <td class="num">{{ linha.proventos_12m|brl }}</td>
+          <td class="num">{{ linha.yield_on_cost|pct if linha.yield_on_cost else "—" }}</td>
+          <td class="num secundario">{{ dy|pct if dy else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endcall %}
+  {% endif %}
+
+  {% call card("Recebidos em " ~ mes.rotulo|lower) %}
+    {% if recebidos_mes %}
+    <ul class="lista-categorias">
+      {% for op in recebidos_mes %}
+      <li>
+        <span class="texto-3 tabular">{{ op.data.strftime("%d/%m") }}</span>
+        <span class="nome"><button type="button" class="link-linha" hx-get="/carteira/operacoes/{{ op.id }}/editar" hx-target="#drawer-conteudo">{{ op.ativo.ticker }}</button>
+          <span class="texto-3"> · {{ op.tipo.rotulo }}{% if op.conta %} · {{ op.conta.nome }}{% endif %}</span></span>
+        <span class="valor"><span class="marcador cor-entrada" aria-hidden="true"></span>{{ op.valor_total_centavos|brl(sinal=True) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      {{ estado_vazio("Nada recebido neste mês", None, "coins") }}
+    {% endif %}
+  {% endcall %}
+</div>
+{% endblock %}

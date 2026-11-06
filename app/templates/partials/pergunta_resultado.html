@@ -1,0 +1,8 @@
+{%- if erro %}
+<p class="campo-erro">{{ icone("circle-alert") }}{{ erro }}</p>
+{%- else %}
+<div class="pilha">
+  <textarea class="entrada entrada-lote" id="texto-pergunta" rows="14" readonly>{{ texto }}</textarea>
+  <div class="linha"><button type="button" class="botao botao-primario" data-copiar="#texto-pergunta">{{ icone("check") }}Copiar pergunta</button></div>
+</div>
+{%- endif %}

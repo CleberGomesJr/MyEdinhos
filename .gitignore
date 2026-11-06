@@ -1,0 +1,22 @@
+# Dados pessoais e segredos — nunca versionar
+data/
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Documentação e backlog (vault do Obsidian): ficam só neste computador
+MyEdinhos/
+.obsidian/
+
+# Testes
+.coverage
+tests/e2e/referencias/.resultado/
+
+# Instruções locais do assistente (não versionar)
+CLAUDE.md
+.claude/

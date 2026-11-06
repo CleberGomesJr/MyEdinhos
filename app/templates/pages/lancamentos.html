@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import badge, estado_vazio %}
+{% block titulo %}Lançamentos · MyEdinhos{% endblock %}
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Lançamentos</h1>
+    <p class="pagina-descricao">{{ "Atrasados de todos os meses" if filtros.situacao.value == "atrasados" else mes.rotulo }}</p>
+  </div>
+  <div class="cabecalho-acoes">
+    <a class="botao botao-ghost" href="/lancamentos/importar">{{ icone("arrow-up") }}Importar extrato</a>
+    <a class="botao botao-secundario" href="/lancamentos/recorrencias">{{ icone("repeat") }}Recorrências</a>
+    <button type="button" class="botao botao-primario" data-atalho-clique="novo">{{ icone("plus") }}Novo lançamento</button>
+  </div>
+</header>
+
+<form class="filtros" hx-get="/lancamentos" hx-target="#lista" hx-select="#lista" hx-swap="outerHTML"
+      hx-push-url="true" hx-trigger="change" role="search" aria-label="Filtrar lançamentos">
+  <input type="hidden" name="mes" value="{{ mes }}">
+  <div class="campo campo-busca">
+    <label class="campo-rotulo" for="filtro-busca">Buscar</label>
+    <div class="busca-campo">
+      {{ icone("search") }}
+      <input class="entrada" type="search" id="filtro-busca" name="busca" value="{{ filtros.busca }}"
+             placeholder="Descrição…" autocomplete="off"
+             hx-get="/lancamentos" hx-trigger="input changed delay:300ms, search" hx-include="closest form">
+    </div>
+  </div>
+  <div class="campo">
+    <label class="campo-rotulo" for="filtro-tipo">Tipo</label>
+    <select class="entrada" id="filtro-tipo" name="tipo">
+      <option value="">Todos</option>
+      {% for tipo in tipos %}<option value="{{ tipo.value }}"{% if filtros.tipo == tipo %} selected{% endif %}>{{ tipo.rotulo }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label class="campo-rotulo" for="filtro-conta">Conta ou cartão</label>
+    <select class="entrada" id="filtro-conta" name="origem">
+      <option value="">Todos</option>
+      <optgroup label="Contas">
+        {% for conta in contas %}<option value="conta-{{ conta.id }}"{% if filtros.origem == "conta-" ~ conta.id %} selected{% endif %}>{{ conta.nome }}{% if not conta.ativa %} (arquivada){% endif %}</option>{% endfor %}
+      </optgroup>
+      {% if cartoes %}
+      <optgroup label="Cartões">
+        {% for cartao in cartoes %}<option value="cartao-{{ cartao.id }}"{% if filtros.origem == "cartao-" ~ cartao.id %} selected{% endif %}>{{ cartao.nome }}{% if not cartao.ativo %} (arquivado){% endif %}</option>{% endfor %}
+      </optgroup>
+      {% endif %}
+    </select>
+  </div>
+  <div class="campo">
+    <label class="campo-rotulo" for="filtro-categoria">Categoria</label>
+    <select class="entrada" id="filtro-categoria" name="categoria_id">
+      <option value="">Todas</option>
+      <optgroup label="Saídas">
+        {% for id, nome in categorias_saida %}<option value="{{ id }}"{% if filtros.categoria_id == id %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+      </optgroup>
+      <optgroup label="Entradas">
+        {% for id, nome in categorias_entrada %}<option value="{{ id }}"{% if filtros.categoria_id == id %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+      </optgroup>
+    </select>
+  </div>
+  <div class="campo">
+    <label class="campo-rotulo" for="filtro-situacao">Situação</label>
+    <select class="entrada" id="filtro-situacao" name="situacao">
+      {% for situacao in situacoes %}<option value="{{ situacao.value }}"{% if filtros.situacao == situacao %} selected{% endif %}>{{ situacao.rotulo }}</option>{% endfor %}
+    </select>
+  </div>
+  <a class="botao botao-ghost" href="/lancamentos?mes={{ mes }}"{% if not filtros.ativos %} hidden{% endif %}>Limpar</a>
+</form>
+
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML">
+  {% if atrasados and filtros.situacao.value != "atrasados" %}
+  <p class="aviso aviso-critico" style="margin-bottom: 16px">
+    {{ icone("octagon-alert") }}
+    <span>{{ atrasados }} lançamento{{ "s" if atrasados > 1 }} atrasado{{ "s" if atrasados > 1 }}.
+      <a href="/lancamentos?mes={{ mes }}&amp;situacao=atrasados">Ver atrasados</a></span>
+  </p>
+  {% endif %}
+
+  <section class="card">
+    {% if not itens %}
+      {% if filtros.ativos %}
+        {{ estado_vazio("Nada encontrado", "Nenhum lançamento corresponde aos filtros.", "search") }}
+      {% else %}
+        {% call estado_vazio("Nada lançado em " ~ mes.rotulo, "Registre despesas e entradas para acompanhar o mês. Atalho: N.", "arrow-left-right") %}
+          <button type="button" class="botao botao-primario" data-atalho-clique="novo">{{ icone("plus") }}Novo lançamento</button>
+        {% endcall %}
+      {% endif %}
+    {% else %}
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">Lançamentos de {{ mes.rotulo }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Data</th>
+            <th scope="col">Descrição</th>
+            <th scope="col" class="ocultar-celular">Categoria</th>
+            <th scope="col" class="ocultar-celular">Conta</th>
+            <th scope="col" class="ocultar-celular">Situação</th>
+            <th scope="col" class="num">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in itens %}
+          {%- set transferencia = item.tipo.value == "transferencia" -%}
+          <tr>
+            <td class="secundario">{{ item.data.strftime("%d/%m") }}</td>
+            <td>
+              <button type="button" class="link-linha" hx-target="#drawer-conteudo"
+                      hx-get="{{ '/cartoes/pagamentos/' ~ item.id ~ '/editar' if item.pagamento_de_fatura else '/lancamentos/' ~ item.id ~ '/editar' }}"
+                      aria-label="Editar {{ item.descricao }}">{{ item.descricao }}</button>
+              {%- if item.parcela_total %}<span class="texto-3"> {{ item.parcela_n }}/{{ item.parcela_total }}</span>{% endif %}
+              {%- if item.recorrencia_id %}{{ icone("repeat", "icone-inline") }}<span class="sr-only"> (recorrente)</span>{% endif %}
+            </td>
+            <td class="ocultar-celular">
+              {%- if item.pagamento_de_fatura %}<span class="secundario">Pagamento de fatura</span>
+              {%- elif transferencia %}<span class="secundario">Transferência</span>
+              {%- elif item.categoria %}{{ badge(item.categoria.nome_completo, slot=item.categoria.cor_slot) }}{% endif %}
+            </td>
+            <td class="secundario ocultar-celular">
+              {%- if item.conta %}{{ item.conta.nome }}{% else %}{{ icone("credit-card", "icone-inline") }} {{ item.cartao.nome }}{% endif %}
+              {%- if transferencia %} → {{ item.conta_destino.nome if item.conta_destino else item.cartao.nome }}{% endif %}
+            </td>
+            <td class="ocultar-celular">
+              {%- if not item.pago %}
+              <span class="linha">
+                {%- if atrasado(item, hoje) %}{{ badge("Atrasado", estado="critico") }}
+                {%- else %}<span class="badge">{{ icone("clock") }}Vence {{ (item.vencimento or item.data).strftime("%d/%m") }}</span>{% endif %}
+                <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/lancamentos/{{ item.id }}/pagar"
+                        aria-label="Marcar {{ item.descricao }} como pago">{{ icone("check") }}Pagar</button>
+              </span>
+              {%- elif item.retroativo %}<span class="badge">{{ icone("check") }}Já paga</span>
+              {%- endif %}
+            </td>
+            <td class="num">
+              <span class="valor">
+                {%- if transferencia %}<span class="marcador" aria-hidden="true"></span>{{ item.valor_centavos|brl }}
+                {%- elif item.tipo.value == "entrada" %}<span class="marcador cor-entrada" aria-hidden="true"></span>{{ item.valor_centavos|brl(sinal=True) }}
+                {%- else %}<span class="marcador cor-saida" aria-hidden="true"></span>{{ (-item.valor_centavos)|brl }}{% endif %}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <footer class="tabela-rodape">
+      <span class="rotulo-total">
+        {{ itens|length }} lançamento{{ "s" if itens|length > 1 }}{% if totais.pendentes %} · {{ totais.pendentes }} pendente{{ "s" if totais.pendentes > 1 }}{% endif %}
+      </span>
+      <span class="totais">
+        <span class="valor"><span class="marcador cor-entrada" aria-hidden="true"></span><span class="rotulo-total">Entradas</span> {{ totais.entradas|brl }}</span>
+        <span class="valor"><span class="marcador cor-saida" aria-hidden="true"></span><span class="rotulo-total">Saídas</span> {{ totais.saidas|brl }}</span>
+        <span class="valor"><span class="rotulo-total">Resultado</span> {{ totais.resultado|brl(sinal=True) }}</span>
+      </span>
+    </footer>
+    <div class="linha card-rodape">
+      <a class="botao botao-ghost botao-pequeno" href="{{ exportar_url }}" download>{{ icone("arrow-down") }}Exportar CSV</a>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

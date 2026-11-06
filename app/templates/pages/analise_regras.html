@@ -1,0 +1,60 @@
+{% extends "pages/analise_base.html" %}
+{% from "components/ui.html" import campo, campo_checkbox, campo_moeda %}
+
+{% block acoes %}
+<button type="button" class="botao botao-secundario" hx-post="/analise/regras/sugestao"
+        hx-confirm="Preencher com a sugestão do perfil moderado? Os valores atuais serão substituídos."
+        data-confirmar-titulo="Usar sugestão" data-confirmar-acao="Preencher">{{ icone("sparkles") }}Usar sugestão do perfil moderado</button>
+{% endblock %}
+
+{% macro campo_pct(rotulo, nome, ajuda=None) -%}
+{{ campo(rotulo, nome, valor=valores.get(nome, ""), erro=erros.get(nome), inputmode="decimal", autocomplete="off", ajuda=ajuda, placeholder="desligada") }}
+{%- endmacro %}
+
+{% block secao %}
+<div id="lista" hx-disinherit="*" hx-get="/analise/regras" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML">
+<form class="pilha" hx-post="/analise/regras" hx-target="#lista" hx-select="#lista" hx-swap="outerHTML" novalidate>
+  <p class="aviso">{{ icone("info") }}<span>Campo em branco = regra desligada. Percentuais da carteira total (investimentos + reserva). Os alertas aparecem em Análise → Visão.</span></p>
+
+  <section class="card pilha">
+    <h2 class="card-titulo">Limites por ativo</h2>
+    <div class="grade-3">
+      {{ campo_pct("Ações e FIIs (%)", "limite_ativo_pct", "Ex.: 5") }}
+      {{ campo_pct("ETF/BDR (%)", "limite_etf_pct", "Índice amplo pode ter mais. Ex.: 8") }}
+      {{ campo_pct("Teto de cripto (%)", "cripto_teto_pct", "Ex.: 2") }}
+    </div>
+  </section>
+
+  <section class="card pilha">
+    <h2 class="card-titulo">Regra de transição (carteira pequena)</h2>
+    <div class="grade-3">
+      {{ campo_moeda("Vale abaixo de", "transicao_patrimonio", texto=valores.get("transicao_patrimonio", ""), erro=erros.get("transicao_patrimonio"), ajuda="Ex.: 20.000,00") }}
+      {{ campo_pct("Limite por ativo na transição (%)", "transicao_limite_pct", "Ex.: 10") }}
+      {{ campo("Máx. de ações do mesmo setor", "transicao_max_por_setor", tipo="number", valor=valores.get("transicao_max_por_setor", ""), erro=erros.get("transicao_max_por_setor"), min=1, max=20, ajuda="Ex.: 2") }}
+    </div>
+  </section>
+
+  <section class="card pilha">
+    <h2 class="card-titulo">Setores e tipos</h2>
+    <div class="grade-3">
+      {{ campo_pct("Ações por setor (%)", "limite_setor_pct", "Ex.: 8") }}
+      {{ campo_pct("FIIs por tipo — tijolo ou papel (%)", "limite_tipo_fii_pct", "Ex.: 12") }}
+      {{ campo_pct("FII de papel, máx. dos FIIs (%)", "papel_max_pct_fiis", "Ex.: 50") }}
+    </div>
+    {{ campo("Setores que você não quer ter", "setores_excluidos", valor=valores.get("setores_excluidos", ""), erro=erros.get("setores_excluidos"), maxlength=500, autocomplete="off", ajuda="Separados por vírgula. Compara com o setor cadastrado em cada ativo.") }}
+    <p class="campo-ajuda">FII de papel = setor com “papel”, “recebíveis” ou “CRI”; os demais contam como tijolo.</p>
+  </section>
+
+  <section class="card pilha">
+    <h2 class="card-titulo">Dividendos e aportes</h2>
+    <div class="grade-3">
+      {{ campo_pct("DY mínimo de ações (%)", "dy_min_acoes", "Ex.: 6") }}
+      {{ campo_pct("DY mínimo de FIIs (%)", "dy_min_fiis", "Ex.: 8") }}
+    </div>
+    {{ campo_checkbox("Enquanto a reserva de emergência estiver incompleta, o aporte vai todo para ela", "reserva_primeiro", marcado=valores.get("reserva_primeiro")) }}
+  </section>
+
+  <div class="linha"><button type="submit" class="botao botao-primario">Salvar regras</button></div>
+</form>
+</div>
+{% endblock %}

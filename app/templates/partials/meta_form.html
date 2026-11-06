@@ -1,0 +1,15 @@
+{% from "components/ui.html" import campo_moeda %}
+<form class="drawer-form" hx-post="/proventos/meta" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">Meta de renda passiva</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+  <div class="drawer-corpo pilha">
+    {{ campo_moeda("Quanto quer receber por mês em proventos", "meta", texto=valores.meta or "", erro=erros.meta, autofocus=True,
+                   ajuda="Comparada com a média dos últimos 12 meses. Deixe em branco para remover a meta.") }}
+  </div>
+  <footer class="drawer-rodape">
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

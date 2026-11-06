@@ -1,0 +1,61 @@
+[project]
+name = "myedinhos"
+version = "0.1.0"
+description = "Controle financeiro e de investimentos pessoal, local."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.13",
+    "fastapi>=0.115",
+    "jinja2>=3.1",
+    "pydantic-settings>=2.6",
+    "python-multipart>=0.0.12",
+    "sqlalchemy>=2.0.36",
+    "tzdata>=2024.2",
+    "uvicorn[standard]>=0.32",
+]
+
+[project.scripts]
+dev = "app.cli:dev"
+iniciar = "app.cli:iniciar"
+migrate = "app.cli:migrate"
+check = "app.cli:check"
+seed-demo = "app.cli:seed_demo"
+demo = "app.cli:demo"
+e2e = "app.cli:e2e"
+atalho = "app.cli:atalho"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+    "pillow>=11",
+    "playwright>=1.49",
+    "pytest>=8.3",
+    "pytest-cov>=6",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "app"
+module-root = ""
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["MyEdinhos"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Gabarito de texto (Markdown para colar numa conversa): linhas longas são o conteúdo.
+"app/domain/snapshot.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -m 'not e2e'"
+markers = ["e2e: ponta a ponta no navegador real (uv run e2e)"]

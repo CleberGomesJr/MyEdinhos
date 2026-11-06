@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}Análise · MyEdinhos{% endblock %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Análise</h1>
+    <p class="pagina-descricao">A carteira comparada com o seu perfil: alocação-alvo, regras, objetivos e rentabilidade. Apoio à decisão, não recomendação.</p>
+  </div>
+  {% block acoes %}{% endblock %}
+</header>
+
+<nav class="subnav" aria-label="Seções da análise">
+  {% for caminho, rotulo in secoes %}
+  <a href="/analise{{ caminho }}"{% if secao == caminho %} aria-current="page"{% endif %}>{{ rotulo }}</a>
+  {% endfor %}
+</nav>
+
+{% block secao %}{% endblock %}
+{% endblock %}

@@ -1,0 +1,113 @@
+{% from "components/ui.html" import campo, campo_moeda, campo_select, campo_checkbox, segmentado %}
+{%- set editando = lancamento is not none -%}
+<form class="drawer-form" hx-post="{{ '/lancamentos/' ~ lancamento.id if editando else '/lancamentos' }}"
+      hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">{{ "Editar lançamento" if editando else "Novo lançamento" }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    {{ segmentado("Tipo", "tipo", [("saida", "Saída", "saida"), ("entrada", "Entrada", "entrada"), ("transferencia", "Transferência", None)],
+                  valores.tipo, erro=erros.tipo) }}
+
+    {{ campo_moeda("Valor", "valor", texto=valores.valor, erro=erros.valor, autofocus=True) }}
+    {{ campo("Descrição", "descricao", valor=valores.descricao, erro=erros.descricao,
+             maxlength=120, autocomplete="off", placeholder="Ex.: Mercado da semana") }}
+
+    <div data-mostrar-se="tipo=saida">
+      {{ campo_select("Categoria", "categoria_id", [("", "Escolha…")] + categorias_saida, valores.categoria_id,
+                      erro=erros.categoria_id, id="categoria-saida") }}
+    </div>
+    <div data-mostrar-se="tipo=entrada">
+      {{ campo_select("Categoria", "categoria_id", [("", "Escolha…")] + categorias_entrada, valores.categoria_id,
+                      erro=erros.categoria_id, id="categoria-entrada") }}
+    </div>
+
+    {% if cartoes %}
+    <div data-mostrar-se="tipo=saida|entrada">
+      {{ segmentado("Pagar com", "meio", [("conta", "Conta", None), ("cartao", "Cartão de crédito", None)], valores.meio,
+                    erro=erros.meio) }}
+    </div>
+    {% endif %}
+
+    <div class="grade-2">
+      <div>
+        <div data-mostrar-se="meio=conta|">
+          {{ campo_select("Conta", "conta_id", contas, valores.conta_id, erro=erros.conta_id) }}
+        </div>
+        <div data-mostrar-se="meio=cartao">
+          {{ campo_select("Cartão", "cartao_id", [("", "Escolha…")] + cartoes, valores.cartao_id, erro=erros.cartao_id) }}
+        </div>
+      </div>
+      <div data-mostrar-se="retroativo=nao|">
+        {{ campo("Data", "data", tipo="date", valor=valores.data, erro=erros.data) }}
+      </div>
+      <div data-mostrar-se="retroativo=sim">
+        {{ campo("Data da parcela atual", "data", tipo="date", valor=valores.data, erro=erros.data,
+                 id="campo-data-parcela-atual") }}
+      </div>
+    </div>
+    <p class="campo-ajuda" data-mostrar-se="meio=cartao">
+      Entra na fatura pela data da compra. Conta como gasto neste mês; a conta só é descontada quando a fatura for paga.
+      Uma entrada no cartão é um crédito ou estorno e reduz a fatura.
+    </p>
+
+    <div data-mostrar-se="tipo=transferencia">
+      {{ campo_select("Para a conta", "conta_destino_id", [("", "Escolha…")] + contas, valores.conta_destino_id,
+                      erro=erros.conta_destino_id,
+                      ajuda="Transferências movem o saldo entre contas e não contam como entrada nem saída.") }}
+    </div>
+
+    <div data-mostrar-se="meio=conta|">
+      {{ campo_checkbox("Pago", "pago", marcado=valores.pago,
+                        ajuda="Desmarque para contas a pagar: só entram no saldo quando forem pagas.") }}
+    </div>
+    <div data-mostrar-se="pago=nao">
+      {{ campo("Vencimento", "vencimento", tipo="date", valor=valores.vencimento, erro=erros.vencimento,
+               ajuda="Se vazio, vale a data do lançamento.") }}
+    </div>
+
+    {% if not editando %}
+    <div data-mostrar-se="tipo=saida|entrada">
+      {{ campo_select("Repetir", "repeticao", repeticoes.items(), valores.repeticao, erro=erros.repeticao) }}
+    </div>
+    <div data-mostrar-se="repeticao=parcelado">
+      {{ campo("Número de parcelas", "parcelas", tipo="number", valor=valores.parcelas, erro=erros.parcelas,
+               min=2, max=120, ajuda="O valor informado é o total; ele é dividido entre as parcelas, uma por mês.") }}
+      {{ campo_checkbox("Compra retroativa (já paguei algumas parcelas)", "retroativo", marcado=valores.retroativo,
+                        ajuda="As parcelas já pagas entram nos meses anteriores como histórico, sem descontar do seu saldo de hoje.") }}
+    </div>
+    <div data-mostrar-se="retroativo=sim">
+      {{ campo("Parcelas já pagas", "parcelas_pagas", tipo="number", valor=valores.parcelas_pagas, erro=erros.parcelas_pagas,
+               min=1, max=119, ajuda="Ex.: se você já pagou 7 de 10, informe 7: você está na parcela 8. A data acima é a da parcela atual (normalmente hoje).") }}
+    </div>
+    {% elif lancamento.parcela_total %}
+    <p class="aviso">{{ icone("layers") }}Parcela {{ lancamento.parcela_n }} de {{ lancamento.parcela_total }}.{% if lancamento.retroativo %} Já paga antes do cadastro: conta nos gastos do mês, mas não mexe no saldo de hoje.{% endif %}</p>
+    {% elif lancamento.recorrencia_id %}
+    <p class="aviso">{{ icone("repeat") }}<span>Gerado por uma recorrência. Para mudar todos os próximos, use <a href="/lancamentos/recorrencias">Recorrências</a>.</span></p>
+    {% endif %}
+
+    {{ campo("Observação", "observacao", valor=valores.observacao, erro=erros.observacao, maxlength=500,
+             autocomplete="off") }}
+  </div>
+
+  <footer class="drawer-rodape">
+    {% if editando %}
+    <button type="button" class="botao botao-ghost" hx-delete="/lancamentos/{{ lancamento.id }}"
+            hx-confirm="Excluir “{{ lancamento.descricao }}” ({{ lancamento.valor_centavos|brl }})?"
+            data-confirmar-titulo="Excluir lançamento" data-confirmar-acao="Excluir">{{ icone("trash-2") }}Excluir</button>
+    {% if lancamento.parcela_total and lancamento.parcela_n < lancamento.parcela_total %}
+    <button type="button" class="botao botao-ghost" hx-delete="/lancamentos/{{ lancamento.id }}?escopo=proximas"
+            hx-confirm="Excluir esta parcela e as {{ lancamento.parcela_total - lancamento.parcela_n }} seguintes?"
+            data-confirmar-titulo="Excluir parcelas" data-confirmar-acao="Excluir">Esta e as próximas</button>
+    {% endif %}
+    <span class="espaco"></span>
+    {% endif %}
+    {#- "Salvar" vem primeiro no HTML para ser o botão do Enter; o CSS o mostra por último. -#}
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    {% if not editando %}
+    <button type="submit" name="continuar" value="1" class="botao botao-secundario">Salvar e adicionar outro</button>
+    {% endif %}
+  </footer>
+</form>

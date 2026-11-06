@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }} · MyEdinhos{% endblock %}
+{% block conteudo %}
+<div class="erro">
+  <p class="erro-codigo">Erro {{ status }}</p>
+  <h1 class="pagina-titulo">{{ titulo }}</h1>
+  <p class="pagina-descricao">{{ mensagem }}</p>
+  <a class="botao botao-primario" href="/">Voltar para a visão geral</a>
+</div>
+{% endblock %}

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import alternar_visao, card, estado_vazio, kpi %}
+{% block titulo %}Relatórios {{ ano }} · MyEdinhos{% endblock %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Relatórios</h1>
+    <p class="pagina-descricao">O ano mês a mês · {{ "por caixa" if caixa else "por competência" }}</p>
+  </div>
+  <div class="cabecalho-acoes">
+    {{ alternar_visao(caixa) }}
+    <nav class="seletor-ano" aria-label="Ano">
+      <a class="botao botao-ghost botao-icone botao-pequeno" href="/relatorios?ano={{ ano - 1 }}" aria-label="Ano anterior">{{ icone("chevron-left") }}</a>
+      <span class="seletor-ano-texto">{{ ano }}</span>
+      <a class="botao botao-ghost botao-icone botao-pequeno" href="/relatorios?ano={{ ano + 1 }}" aria-label="Próximo ano">{{ icone("chevron-right") }}</a>
+    </nav>
+  </div>
+</header>
+
+{%- set total = resumo.total %}
+<div class="pilha">
+  {#- E3-10: resumo anual -#}
+  <div class="grade">
+    <div class="col-3">{{ kpi("Entradas no ano", total.entradas|brl, cor="entrada",
+                              detalhe=(anterior.entradas|brl ~ " em " ~ (ano - 1)) if anterior.entradas else None) }}</div>
+    <div class="col-3">{{ kpi("Saídas no ano", total.saidas|brl, cor="saida",
+                              detalhe="média de " ~ resumo.media_saidas|brl ~ " por mês") }}</div>
+    <div class="col-3">{{ kpi("Resultado do ano", total.saldo|brl(sinal=True),
+                              detalhe=("Taxa de poupança " ~ total.taxa_poupanca|pct) if total.taxa_poupanca is not none else "Sem entradas no ano") }}</div>
+    <div class="col-3">
+      <div class="card kpi">
+        <p class="kpi-rotulo">Melhor e pior mês</p>
+        {%- if resumo.melhor %}
+        <p class="kpi-melhor-pior">
+          <span>{{ icone("arrow-up") }}{{ resumo.melhor[0].rotulo_curto }} <span class="tabular">{{ resumo.melhor[1].saldo|brl(sinal=True) }}</span></span>
+          <span>{{ icone("arrow-down") }}{{ resumo.pior[0].rotulo_curto }} <span class="tabular">{{ resumo.pior[1].saldo|brl(sinal=True) }}</span></span>
+        </p>
+        <p class="kpi-rodape"><span>pelo resultado · média {{ resumo.media_resultado|brl(sinal=True) }}</span></p>
+        {%- else %}
+        <p class="kpi-rodape"><span>Sem lançamentos no ano</span></p>
+        {%- endif %}
+      </div>
+    </div>
+  </div>
+
+  {% call card("Mês a mês", ano ~ (" · caixa" if caixa else " · competência")) %}
+  <div class="tabela-container">
+    <table class="tabela">
+      <caption class="sr-only">Entradas, saídas e resultado de cada mês de {{ ano }}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Mês</th>
+          <th scope="col" class="num">Entradas</th>
+          <th scope="col" class="num">Saídas</th>
+          <th scope="col" class="num">Resultado</th>
+          <th scope="col" class="num ocultar-celular">Poupança</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mes_item, r in resumo.meses %}
+        <tr{% if mes_item > mes_atual %} class="texto-3"{% endif %}>
+          <th scope="row"><a class="link-linha" href="/?mes={{ mes_item }}">{{ mes_item.rotulo }}</a>
+            {%- if resumo.melhor and mes_item == resumo.melhor[0] and resumo.com_movimento|length > 1 %} <span class="badge">Melhor</span>{% endif %}
+            {%- if resumo.pior and mes_item == resumo.pior[0] and resumo.com_movimento|length > 1 %} <span class="badge">Pior</span>{% endif %}
+          </th>
+          <td class="num">{{ r.entradas|brl if r.entradas else "—" }}</td>
+          <td class="num">{{ r.saidas|brl if r.saidas else "—" }}</td>
+          <td class="num">{{ r.saldo|brl(sinal=True) if (r.entradas or r.saidas) else "—" }}</td>
+          <td class="num secundario ocultar-celular">{{ r.taxa_poupanca|pct(casas=0) if r.taxa_poupanca is not none else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td class="rotulo-total">Total</td>
+          <td class="num">{{ total.entradas|brl }}</td>
+          <td class="num">{{ total.saidas|brl }}</td>
+          <td class="num">{{ total.saldo|brl(sinal=True) }}</td>
+          <td class="num ocultar-celular">{{ total.taxa_poupanca|pct(casas=0) if total.taxa_poupanca is not none else "—" }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% endcall %}
+
+  {#- E3-09: categoria × mês (sempre por competência: compra no cartão tem categoria; pagamento de fatura não) -#}
+  {% call card("Gastos por categoria e mês", ano ~ " · competência · quanto mais forte o tom, maior o gasto") %}
+  {% if mapa.linhas %}
+  <div class="tabela-container">
+    <table class="tabela mapa-calor">
+      <caption class="sr-only">Saídas de cada categoria em cada mês de {{ ano }}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Categoria</th>
+          {% for m in meses %}<th scope="col" class="num">{{ m.rotulo_curto.split("/")[0] }}</th>{% endfor %}
+          <th scope="col" class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linha in mapa.linhas %}
+        <tr>
+          <th scope="row"><span class="linha-nome"><span class="marcador slot-{{ linha.categoria.cor_slot }}" aria-hidden="true"></span>{{ linha.categoria.nome }}</span></th>
+          {% for valor in linha.valores %}
+          {%- set nivel = mapa.intensidade(valor) %}
+          <td class="num celula-calor{% if nivel > 55 %} celula-forte{% endif %}" style="--nivel: {{ nivel }}%"
+              title="{{ linha.categoria.nome }} em {{ meses[loop.index0].rotulo|lower }}: {{ valor|brl }}">
+            {{- valor|reais if valor else "" }}</td>
+          {% endfor %}
+          <td class="num">{{ linha.total|brl }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td class="rotulo-total">Total</td>
+          {% for valor in mapa.totais_por_mes %}<td class="num">{{ valor|reais if valor else "" }}</td>{% endfor %}
+          <td class="num">{{ (mapa.totais_por_mes|sum)|brl }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p class="campo-ajuda assistente-nota">Valores em reais inteiros (sem centavos) para caber; passe o mouse para ver o valor exato. Subcategorias somam na categoria principal.</p>
+  {% else %}
+    {{ estado_vazio("Sem saídas em " ~ ano, "Os gastos de cada categoria aparecem aqui mês a mês.", "table") }}
+  {% endif %}
+  {% endcall %}
+</div>
+{% endblock %}

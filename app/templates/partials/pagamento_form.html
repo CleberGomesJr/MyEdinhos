@@ -1,0 +1,32 @@
+{% from "components/ui.html" import campo, campo_moeda, campo_select %}
+<form class="drawer-form" hx-target="#drawer-conteudo" novalidate
+      hx-post="{{ '/cartoes/pagamentos/' ~ pagamento.id if pagamento else '/cartoes/faturas/' ~ fatura.id ~ '/pagamentos' }}">
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">{{ "Editar pagamento" if pagamento else "Pagar fatura" }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    <p class="aviso">{{ icone("credit-card") }}
+      <span>{{ fatura.cartao.nome }} · fatura de {{ referencia.rotulo|lower }} (vence {{ fatura.data_vencimento|data_br }}):
+        total {{ resumo.total|brl }}, falta {{ resumo.restante|brl }}.</span></p>
+    {{ campo_moeda("Valor pago", "valor", texto=valores.valor, erro=erros.valor, autofocus=True,
+                   ajuda="Pode ser parcial. O que faltar continua na fatura.") }}
+    <div class="grade-2">
+      {{ campo_select("Da conta", "conta_id", contas, valores.conta_id, erro=erros.conta_id) }}
+      {{ campo("Data do pagamento", "data", tipo="date", valor=valores.data, erro=erros.data) }}
+    </div>
+    <p class="campo-ajuda">O pagamento sai do saldo da conta como transferência para o cartão: não conta como gasto de novo, porque as compras já contaram no mês em que foram feitas.</p>
+  </div>
+
+  <footer class="drawer-rodape">
+    {% if pagamento %}
+    <button type="button" class="botao botao-ghost" hx-delete="/lancamentos/{{ pagamento.id }}"
+            hx-confirm="Estornar este pagamento de {{ pagamento.valor_centavos|brl }}? A fatura volta a ficar em aberto."
+            data-confirmar-titulo="Estornar pagamento" data-confirmar-acao="Estornar">{{ icone("undo-2") }}Estornar</button>
+    <span class="espaco"></span>
+    {% endif %}
+    <button type="submit" class="botao botao-primario ordem-ultima">{{ "Salvar" if pagamento else "Registrar pagamento" }}</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

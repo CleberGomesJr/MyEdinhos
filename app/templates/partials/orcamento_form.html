@@ -1,0 +1,22 @@
+{% from "components/ui.html" import campo_moeda %}
+<form class="drawer-form" hx-post="/orcamento/{{ categoria.id }}" hx-target="#drawer-conteudo" novalidate>
+  <input type="hidden" name="mes" value="{{ mes_form }}">
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">Limite de {{ categoria.nome }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    <dl class="resumo-lista">
+      <div><dt>Gasto em {{ mes_form.rotulo|lower }}</dt><dd>{{ linha.gasto|brl }}</dd></div>
+      <div><dt>Média dos 3 meses anteriores</dt><dd>{{ media|brl }}</dd></div>
+    </dl>
+    {{ campo_moeda("Limite por mês", "limite", texto=valores.limite or "", erro=erros.limite, autofocus=True,
+                   ajuda="Vale de " ~ mes_form.rotulo|lower ~ " em diante. Deixe em branco para tirar o limite.") }}
+  </div>
+
+  <footer class="drawer-rodape">
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

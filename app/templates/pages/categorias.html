@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import estado_vazio %}
+{% block titulo %}Categorias · MyEdinhos{% endblock %}
+
+{% macro item(categoria, subcategoria=False) -%}
+<li{% if subcategoria %} class="subcategoria"{% endif %}>
+  <span class="marcador slot-{{ categoria.cor_slot }}" aria-hidden="true"></span>
+  {{ icone(categoria.icone) }}
+  <span class="nome">
+    <button type="button" class="link-linha" hx-get="/categorias/{{ categoria.id }}/editar" hx-target="#drawer-conteudo"
+            aria-label="Editar {{ categoria.nome_completo }}">{{ categoria.nome }}</button>
+  </span>
+  {%- if not subcategoria %}
+  <button type="button" class="botao botao-ghost botao-pequeno botao-icone" data-dica="Nova subcategoria"
+          aria-label="Nova subcategoria de {{ categoria.nome }}"
+          hx-get="/categorias/nova?tipo={{ categoria.tipo.value }}&amp;pai_id={{ categoria.id }}" hx-target="#drawer-conteudo">{{ icone("plus") }}</button>
+  {%- endif %}
+</li>
+{%- endmacro %}
+
+{% macro grupo(titulo, tipo, grupos) -%}
+<section class="card">
+  <header class="card-cabecalho">
+    <h2 class="card-titulo">{{ titulo }}</h2>
+    <button type="button" class="botao botao-secundario botao-pequeno" hx-get="/categorias/nova?tipo={{ tipo }}"
+            hx-target="#drawer-conteudo">{{ icone("plus") }}Nova</button>
+  </header>
+  {% if grupos %}
+  <ul class="lista-categorias">
+    {% for g in grupos %}
+      {{ item(g.categoria) }}
+      {% for filha in g.subcategorias %}{{ item(filha, True) }}{% endfor %}
+    {% endfor %}
+  </ul>
+  {% else %}
+    {{ estado_vazio("Nenhuma categoria", "Crie categorias para organizar os lançamentos.", "tags") }}
+  {% endif %}
+</section>
+{%- endmacro %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Categorias</h1>
+    <p class="pagina-descricao">A cor identifica a categoria nos gráficos; subcategorias usam a cor da principal.</p>
+  </div>
+</header>
+
+<div id="lista" hx-disinherit="*" hx-get="/categorias" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  <div class="grade">
+    <div class="col-6">{{ grupo("Saídas", "saida", saidas) }}</div>
+    <div class="col-6">{{ grupo("Entradas", "entrada", entradas) }}</div>
+  </div>
+
+  {% if arquivadas %}
+  <section class="card">
+    <header class="card-cabecalho">
+      <div>
+        <h2 class="card-titulo">Arquivadas</h2>
+        <p class="card-subtitulo">Continuam nos lançamentos antigos, mas não aparecem nos novos.</p>
+      </div>
+    </header>
+    <ul class="lista-categorias">
+      {% for categoria in arquivadas %}
+      <li>
+        <span class="marcador slot-{{ categoria.cor_slot }}" aria-hidden="true"></span>
+        <span class="nome secundario">{{ categoria.nome_completo }} · {{ categoria.tipo.rotulo }}</span>
+        <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/categorias/{{ categoria.id }}/reativar">{{ icone("archive-restore") }}Reativar</button>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

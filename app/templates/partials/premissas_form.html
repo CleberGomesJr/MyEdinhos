@@ -1,0 +1,22 @@
+{% from "components/ui.html" import campo, campo_moeda %}
+<form class="drawer-form" hx-post="/analise/objetivos/premissas" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">Premissas das projeções</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+  <div class="drawer-corpo pilha">
+    {{ campo_moeda("Aporte mensal planejado", "aporte_mensal", texto=valores.aporte_mensal, erro=erros.aporte_mensal, autofocus=True,
+                   ajuda="Também é o valor sugerido em “Onde colocar o aporte”.") }}
+    <div class="grade-2">
+      {{ campo("Retorno ao ano (%)", "premissa_retorno_aa", valor=valores.premissa_retorno_aa, erro=erros.premissa_retorno_aa, inputmode="decimal",
+               ajuda="Nominal, sem IR. Ex.: 8 a 12.") }}
+      {{ campo("Yield em proventos (%)", "premissa_yield", valor=valores.premissa_yield, erro=erros.premissa_yield, inputmode="decimal",
+               ajuda="Sobre o investido em renda variável. Ex.: 7.") }}
+    </div>
+    {{ campo("Reserva de emergência (meses de despesa)", "reserva_meses", tipo="number", valor=valores.reserva_meses, erro=erros.reserva_meses, min=1, max=24) }}
+  </div>
+  <footer class="drawer-rodape">
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

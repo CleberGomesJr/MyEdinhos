@@ -1,0 +1,65 @@
+{% extends "pages/analise_base.html" %}
+{% from "components/ui.html" import badge, card, estado_vazio, kpi %}
+{% from "components/mercado.html" import status_mercado %}
+{% from "components/analise.html" import alerta_item, barra_alvo %}
+
+{% block acoes %}<div class="cabecalho-acoes">{{ status_mercado(mercado_status, atualizar_agora) }}</div>{% endblock %}
+
+{% block secao %}
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {#- E6-05: rentabilidade × índices -#}
+  {% if rentab.inicio %}
+  {%- set base = "ao ano" if rentab.anualizado else "desde " ~ rentab.inicio.strftime("%d/%m/%Y") %}
+  <div class="grade">
+    <div class="col-3">{{ kpi("Carteira (XIRR)", rentab.retorno|pct(sinal=True) if rentab.retorno is not none else "—", cor="patrimonio",
+                              detalhe=base if rentab.retorno is not none else "precisa de 30 dias de histórico") }}</div>
+    {% for c in rentab.comparacoes %}
+    <div class="col-3">{{ kpi(c.nome, c.retorno|pct(sinal=True) if c.retorno is not none else "—",
+                              detalhe=base if c.retorno is not none else "sem dados do período (atualize as cotações)") }}</div>
+    {% endfor %}
+  </div>
+  <p class="campo-ajuda">XIRR considera quando cada real entrou e saiu (compras, vendas e proventos) e o valor de hoje.
+    {%- if not rentab.anualizado %} Com menos de 1 ano, os números são do período, não ao ano.{% endif %} Antes de IR.</p>
+  {% else %}
+  <section class="card">{{ estado_vazio("Sem operações na carteira", "Cadastre a posição inicial em Carteira para ver a rentabilidade.", "chart-line") }}</section>
+  {% endif %}
+
+  <div class="grade">
+    {#- E6-06 / E6-12: alertas -#}
+    <div class="col-8">
+      {% call card("Fora da regra", "Suas regras, a alocação-alvo e os dividendos") %}
+        {% if not regras_configuradas %}
+        {% call estado_vazio("Regras ainda não configuradas", "Preencha seus limites e critérios (ou use a sugestão do perfil moderado) para os alertas aparecerem.", "target") %}
+          <a class="botao botao-secundario botao-pequeno" href="/analise/regras">Configurar regras</a>
+        {% endcall %}
+        {% elif alertas %}
+        <ul class="lista-alertas">{% for alerta in alertas %}{{ alerta_item(alerta) }}{% endfor %}</ul>
+        {% else %}
+          {{ estado_vazio("Tudo dentro das suas regras", None, "circle-check") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+    <div class="col-4 pilha">
+      {% call card("Alocação", "Atual × alvo") %}
+        {% if situacao.tem_metas and situacao.total %}
+        <ul class="barras-lista">{% for linha in situacao.linhas if linha.valor or linha.alvo %}{{ barra_alvo(linha) }}{% endfor %}</ul>
+        <div class="linha card-rodape"><a class="botao botao-ghost botao-pequeno" href="/analise/alocacao">Onde aportar{{ icone("chevron-right") }}</a></div>
+        {% else %}
+          {% call estado_vazio("Sem alocação-alvo", "Defina os percentuais por classe.", "chart-pie") %}
+            <a class="botao botao-secundario botao-pequeno" href="/analise/alocacao">Definir alocação</a>
+          {% endcall %}
+        {% endif %}
+      {% endcall %}
+      {% call card("Reserva de emergência", (reserva.meses ~ " meses de despesa")) %}
+        {% if reserva.alvo %}
+        <p class="kpi-valor">{{ reserva.percentual|pct(casas=0) }}</p>
+        <div class="barra"><span class="barra-preenchida {{ 'estado-ok' if reserva.completa else 'estado-atencao' }}" style="width: {{ reserva.percentual|round(1) }}%"></span></div>
+        <p class="kpi-rodape cartao-uso-detalhe"><span>{{ reserva.atual|brl }} de {{ reserva.alvo|brl }}</span></p>
+        {% else %}
+          <p class="texto-2">Aparece quando houver despesas lançadas (o alvo é {{ reserva.meses }} × a despesa média do mês).</p>
+        {% endif %}
+      {% endcall %}
+    </div>
+  </div>
+</div>
+{% endblock %}

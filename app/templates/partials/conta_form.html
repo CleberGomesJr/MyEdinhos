@@ -1,0 +1,36 @@
+{% from "components/ui.html" import campo, campo_checkbox, campo_moeda, campo_select %}
+<form class="drawer-form" hx-post="{{ '/contas/' ~ conta.id if conta else '/contas' }}" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">{{ "Editar conta" if conta else "Nova conta" }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    {{ campo("Nome", "nome", valor=valores.nome, erro=erros.nome, maxlength=60, autocomplete="off",
+             autofocus=True, placeholder="Ex.: Nubank") }}
+    {{ campo_select("Tipo", "tipo", tipos, valores.tipo, erro=erros.tipo) }}
+    <div class="grade-2">
+      {{ campo_moeda("Saldo inicial", "saldo_inicial", texto=valores.saldo_inicial, negativo=True,
+                     erro=erros.saldo_inicial) }}
+      {{ campo("No início do dia", "data_saldo_inicial", tipo="date", valor=valores.data_saldo_inicial,
+               erro=erros.data_saldo_inicial) }}
+    </div>
+    <p class="campo-ajuda">
+      Informe o saldo que a conta tinha no começo desse dia. Lançamentos a partir dessa data movem o saldo;
+      os anteriores ficam só como histórico. Para saldo negativo, comece com “-”.
+    </p>
+    {{ campo_checkbox("Faz parte da reserva de emergência", "reserva_emergencia", marcado=valores.reserva_emergencia,
+                      ajuda="Conta como reserva nos Objetivos e como renda fixa na alocação.") }}
+  </div>
+
+  <footer class="drawer-rodape">
+    {% if conta %}
+    <button type="button" class="botao botao-ghost" hx-post="/contas/{{ conta.id }}/arquivar"
+            hx-confirm="Arquivar “{{ conta.nome }}”? Ela sai das listas, mas o histórico continua."
+            data-confirmar-titulo="Arquivar conta" data-confirmar-acao="Arquivar">{{ icone("archive") }}Arquivar</button>
+    <span class="espaco"></span>
+    {% endif %}
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

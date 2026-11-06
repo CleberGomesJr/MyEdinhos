@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import card, estado_vazio, grafico, kpi, variacao %}
+{% from "components/mercado.html" import origem_valor, resultado, status_mercado %}
+{% block titulo %}Carteira · MyEdinhos{% endblock %}
+{% block scripts %}
+  <script src="{{ estatico('vendor/chart.umd.js') }}" defer></script>
+  <script src="{{ estatico('js/charts.js') }}" defer></script>
+{% endblock %}
+
+{% macro coluna(rotulo, chave, classe="") -%}
+<th scope="col" class="{{ classe }}"{% if ordem == chave %} aria-sort="{{ 'ascending' if chave in ('ativo', 'classe') else 'descending' }}"{% endif %}>
+  <a class="link-linha cabecalho-ordenavel" href="/carteira?ordem={{ chave }}">{{ rotulo }}{% if ordem == chave %} {{ icone("arrow-down" if chave not in ('ativo', 'classe') else "arrow-up", "icone-inline") }}{% endif %}</a>
+</th>
+{%- endmacro %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Carteira</h1>
+    <p class="pagina-descricao">O que você tem, quanto custou, quanto vale e quanto pagou de proventos.</p>
+  </div>
+  <div class="cabecalho-acoes">
+    {{ status_mercado(mercado_status, atualizar_agora) }}
+  </div>
+</header>
+
+<div class="linha" style="margin-bottom: 16px">
+  <button type="button" class="botao botao-primario" hx-get="/carteira/operacoes/nova" hx-target="#drawer-conteudo">{{ icone("plus") }}Nova operação</button>
+  <button type="button" class="botao botao-secundario" hx-get="/carteira/posicao-inicial" hx-target="#drawer-conteudo">{{ icone("layers") }}Posição inicial</button>
+  <button type="button" class="botao botao-ghost" hx-get="/carteira/ativos/novo" hx-target="#drawer-conteudo">{{ icone("plus") }}Novo ativo</button>
+  <a class="botao botao-ghost" href="/carteira/importar">{{ icone("arrow-up") }}Importar operações</a>
+</div>
+
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {% if not cart.linhas %}
+  <section class="card">
+    {% call estado_vazio("Carteira vazia", "Cadastre o que você já tem com “Posição inicial” (ticker, quantidade e preço médio, sem histórico) ou registre uma compra.", "briefcase") %}
+      <button type="button" class="botao botao-primario" hx-get="/carteira/posicao-inicial" hx-target="#drawer-conteudo">{{ icone("layers") }}Posição inicial</button>
+    {% endcall %}
+  </section>
+  {% else %}
+
+  {#- E4-07 / E4-14: KPIs -#}
+  <div class="grade">
+    <div class="col-3">{{ kpi("Patrimônio", cart.patrimonio|brl, cor="patrimonio",
+                              detalhe=(cart.sem_cotacao|length ~ " ativo(s) pelo custo, sem cotação") if cart.sem_cotacao else "valor de mercado") }}</div>
+    <div class="col-3">{{ kpi("Aportado", cart.aportado|brl,
+                              detalhe=("Vendas: " ~ cart.realizado|brl(sinal=True) ~ " realizado") if cart.realizado else "custo das posições") }}</div>
+    <div class="col-3">
+      <div class="card kpi">
+        <p class="kpi-rotulo">Resultado não realizado</p>
+        <p class="kpi-valor">{{ cart.resultado|brl(sinal=True) }}</p>
+        <p class="kpi-rodape">{% if cart.resultado_pct is not none %}{{ variacao(cart.resultado_pct) }}{% endif %}<span>sobre o aportado</span></p>
+      </div>
+    </div>
+    <div class="col-3">{{ kpi("Proventos em 12 meses", cart.proventos_12m|brl, cor="entrada",
+                              detalhe=("Yield on cost " ~ cart.yield_on_cost|pct) if cart.yield_on_cost is not none else None) }}</div>
+  </div>
+
+  <div class="grade">
+    <div class="col-8">
+      {% call card("Evolução do patrimônio", "Fim de cada mês; sem cotação na data, vale o custo") %}
+        {% if evolucao.rotulos|length > 1 %}
+          {{ grafico("grafico-patrimonio", "linha", evolucao, "Patrimônio e valor aportado no fim de cada mês") }}
+        {% else %}
+          {{ estado_vazio("Pouco histórico ainda", "O gráfico aparece a partir do segundo mês com posição.", "chart-line") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+    <div class="col-4">
+      {% call card("Alocação por classe", "Pelo valor de hoje") %}
+        <ul class="barras-lista" aria-label="Alocação por classe">
+          {% for fatia in alocacao %}
+          <li>
+            <div class="barras-linha">
+              <span class="marcador slot-{{ fatia.slot }}" aria-hidden="true"></span>
+              <span class="barras-nome">{{ fatia.nome }}</span>
+              <span class="tabular">{{ fatia.valor|brl }}</span>
+              <span class="barras-pct tabular">{{ fatia.percentual|pct(casas=0) }}</span>
+            </div>
+            <div class="barra" aria-hidden="true"><span class="barra-preenchida slot-{{ fatia.slot }}" style="width: {{ fatia.percentual|round(1) }}%"></span></div>
+          </li>
+          {% endfor %}
+        </ul>
+      {% endcall %}
+    </div>
+  </div>
+
+  <div class="grade">
+    <div class="col-8">
+      {% call card("Proventos por mês", "Últimos 12 meses") %}
+        {% if tem_proventos %}
+          {{ grafico("grafico-proventos", "barras", proventos_mes, "Proventos recebidos por mês nos últimos 12 meses") }}
+        {% else %}
+          {% call estado_vazio("Nenhum provento lançado", "Lance dividendos, JCP e rendimentos como operação, ou confirme as sugestões na tela Proventos.", "coins") %}
+            <a class="botao botao-secundario botao-pequeno" href="/proventos">Ver proventos</a>
+          {% endcall %}
+        {% endif %}
+      {% endcall %}
+    </div>
+    <div class="col-4">
+      {% call card("Quem mais pagou", "Últimos 12 meses") %}
+        {% if ranking %}
+        <ul class="barras-lista" aria-label="Ativos que mais pagaram proventos">
+          {% for item in ranking %}
+          <li>
+            <div class="barras-linha">
+              <span class="marcador slot-{{ item.slot }}" aria-hidden="true"></span>
+              <span class="barras-nome">{{ item.nome }}</span>
+              <span class="tabular">{{ item.valor|brl }}</span>
+            </div>
+            <div class="barra" aria-hidden="true"><span class="barra-preenchida slot-{{ item.slot }}" style="width: {{ item.percentual|round(1) }}%"></span></div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          {{ estado_vazio("Sem proventos no período", None, "coins") }}
+        {% endif %}
+      {% endcall %}
+    </div>
+  </div>
+
+  {#- E4-07: posições -#}
+  <section class="card">
+    <header class="card-cabecalho"><h2 class="card-titulo">Posições</h2><span class="texto-3">{{ cart.linhas|length }} ativo(s)</span></header>
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">Posições da carteira</caption>
+        <thead>
+          <tr>
+            {{ coluna("Ativo", "ativo") }}
+            <th scope="col" class="num ocultar-celular">Quantidade</th>
+            <th scope="col" class="num ocultar-celular">Preço médio</th>
+            {{ coluna("Valor", "valor", "num") }}
+            {{ coluna("Resultado", "resultado", "num ocultar-celular") }}
+            {{ coluna("Proventos 12m", "proventos", "num ocultar-celular") }}
+            <th scope="col" class="num ocultar-celular" title="Dividend yield: proventos por unidade em 12 meses ÷ cotação de hoje">DY</th>
+            <th scope="col" class="num ocultar-celular">Carteira</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in cart.linhas %}
+          <tr>
+            <td>
+              <span class="linha-nome" title="{{ linha.ativo.classe.rotulo }}">
+                <span class="marcador slot-{{ linha.ativo.classe.cor_slot }}" aria-hidden="true"></span>
+                <a class="link-linha peso-500" href="/carteira/ativos/{{ linha.ativo.id }}">{{ linha.ativo.ticker }}</a>
+              </span>
+              <div class="texto-3 nome-ativo">{{ linha.ativo.nome if linha.ativo.nome != linha.ativo.ticker else linha.ativo.classe.rotulo }}</div>
+            </td>
+            <td class="num ocultar-celular">{{ linha.posicao.quantidade|qtd }}</td>
+            <td class="num secundario ocultar-celular">{{ linha.posicao.preco_medio|preco }}</td>
+            <td class="num">{{ linha.valor|brl }}<div class="celula-detalhe">{{ origem_valor(linha) }}</div></td>
+            <td class="num ocultar-celular">
+              {{- resultado(linha.resultado, None) }}
+              {%- if linha.resultado_pct is not none %}<div class="celula-detalhe texto-3">{{ linha.resultado_pct|pct(sinal=True) }}</div>{% endif %}
+            </td>
+            <td class="num ocultar-celular">
+              {{- linha.proventos_12m|brl if linha.proventos_12m else "—" }}
+              {%- if linha.yield_on_cost %}<div class="celula-detalhe texto-3" title="Yield on cost: proventos de 12 meses ÷ custo">YoC {{ linha.yield_on_cost|pct }}</div>{% endif %}
+            </td>
+            <td class="num secundario ocultar-celular">{{ dy[linha.ativo.id]|pct if dy[linha.ativo.id] else "—" }}</td>
+            <td class="num secundario ocultar-celular">{{ linha.participacao|pct(casas=0) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if arquivados %}
+  <section class="card">
+    <header class="card-cabecalho"><h2 class="card-titulo">Ativos arquivados</h2></header>
+    <ul class="lista-categorias">
+      {% for ativo in arquivados %}
+      <li>
+        <span class="nome secundario"><a class="link-linha" href="/carteira/ativos/{{ ativo.id }}">{{ ativo.ticker }}</a></span>
+        <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/carteira/ativos/{{ ativo.id }}/reativar">{{ icone("archive-restore") }}Reativar</button>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

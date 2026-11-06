@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import estado_vazio %}
+{% block titulo %}Contas · MyEdinhos{% endblock %}
+
+{% macro saldo(valor) -%}
+{{ valor|brl if valor is not none else "—" }}
+{%- endmacro %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Contas</h1>
+    <p class="pagina-descricao">Saldo de hoje e previsão para o fim de {{ mes.rotulo }}, incluindo o que está a pagar, a receber e as faturas de cartão que vencem até lá.</p>
+  </div>
+  <button type="button" class="botao botao-primario" hx-get="/contas/nova" hx-target="#drawer-conteudo">{{ icone("plus") }}Nova conta</button>
+</header>
+
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  <section class="card">
+    {% if not ativas %}
+      {{ estado_vazio("Nenhuma conta ativa", "Cadastre a conta onde o seu dinheiro fica para acompanhar o saldo.", "wallet") }}
+    {% else %}
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">Contas ativas</caption>
+        <thead>
+          <tr>
+            <th scope="col">Conta</th>
+            <th scope="col" class="ocultar-celular">Tipo</th>
+            <th scope="col" class="num">Saldo hoje</th>
+            <th scope="col" class="num">Previsto em {{ mes.ultimo_dia.strftime("%d/%m") }}</th>
+            <th scope="col" class="acoes"><span class="sr-only">Ações</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for conta in ativas %}
+          <tr>
+            <td>
+              <button type="button" class="link-linha" hx-get="/contas/{{ conta.id }}/editar" hx-target="#drawer-conteudo">{{ conta.nome }}</button>
+            </td>
+            <td class="secundario ocultar-celular">{{ conta.tipo.rotulo }}</td>
+            <td class="num">{{ saldo(atuais.get(conta.id)) }}</td>
+            <td class="num secundario">{{ saldo(previstos.get(conta.id)) }}</td>
+            <td class="acoes">
+              <a class="botao botao-ghost botao-pequeno" href="/lancamentos?mes={{ mes }}&amp;conta_id={{ conta.id }}">Lançamentos</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% if ativas|length > 1 %}
+        <tfoot>
+          <tr>
+            <td class="rotulo-total">Total</td>
+            <td class="ocultar-celular"></td>
+            <td class="num">{{ total_atual|brl }}</td>
+            <td class="num">{{ total_previsto|brl }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if arquivadas %}
+  <section class="card">
+    <header class="card-cabecalho"><h2 class="card-titulo">Arquivadas</h2></header>
+    <ul class="lista-categorias">
+      {% for conta in arquivadas %}
+      <li>
+        <span class="nome secundario">{{ conta.nome }}</span>
+        <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/contas/{{ conta.id }}/reativar">{{ icone("archive-restore") }}Reativar</button>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% from "components/ui.html" import campo, campo_checkbox, campo_select %}
+<form class="drawer-form" hx-post="{{ '/carteira/ativos/' ~ ativo.id if ativo else '/carteira/ativos' }}" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">{{ "Editar " ~ ativo.ticker if ativo else "Novo ativo" }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    <div class="grade-2">
+      {{ campo("Código", "ticker", valor=valores.ticker, erro=erros.ticker, maxlength=20, autocomplete="off", autofocus=True,
+               placeholder="Ex.: ITSA4", ajuda="Como na B3, sem .SA") }}
+      {{ campo_select("Classe", "classe", classes, valores.classe, erro=erros.classe) }}
+    </div>
+    {{ campo("Nome", "nome", valor=valores.nome, erro=erros.nome, maxlength=120, autocomplete="off", ajuda="Opcional.") }}
+    {{ campo("Setor", "setor", valor=valores.setor, erro=erros.setor, maxlength=60, autocomplete="off",
+             ajuda="Opcional. Ex.: Bancos, Energia, Logística.") }}
+
+    <div class="pilha" data-mostrar-se="classe=renda_fixa|tesouro">
+      {{ campo_select("Indexador", "indexador", indexadores, valores.indexador, erro=erros.indexador) }}
+      <div class="grade-2">
+        {{ campo("Taxa", "taxa", valor=valores.taxa, erro=erros.taxa, inputmode="decimal", autocomplete="off",
+                 ajuda="% do CDI/Selic (ex.: 110) ou % ao ano (IPCA + 6,5; prefixado 12).") }}
+        {{ campo("Vencimento", "vencimento", tipo="date", valor=valores.vencimento, erro=erros.vencimento) }}
+      </div>
+      <p class="campo-ajuda">O valor de hoje é uma estimativa pelo indexador (sem IR e sem marcação a mercado).</p>
+      {{ campo_checkbox("Faz parte da reserva de emergência", "reserva_emergencia", marcado=valores.reserva_emergencia,
+                        ajuda="Ex.: Tesouro Selic ou CDB de liquidez diária.") }}
+    </div>
+  </div>
+
+  <footer class="drawer-rodape">
+    {% if ativo %}
+    {% if ativo.ativo %}
+    <button type="button" class="botao botao-ghost" hx-post="/carteira/ativos/{{ ativo.id }}/arquivar"
+            hx-confirm="Arquivar {{ ativo.ticker }}? Sai das listas e da atualização de cotações; as operações ficam."
+            data-confirmar-titulo="Arquivar ativo" data-confirmar-acao="Arquivar">{{ icone("archive") }}Arquivar</button>
+    <span class="espaco"></span>
+    {% endif %}
+    {% endif %}
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import card, kpi, variacao, badge, estado_vazio, skeleton, campo, campo_moeda, campo_select, grafico %}
+{% block titulo %}Guia visual · MyEdinhos{% endblock %}
+{% block scripts %}
+  <script src="{{ estatico('vendor/chart.umd.js') }}" defer></script>
+  <script src="{{ estatico('js/charts.js') }}" defer></script>
+{% endblock %}
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Guia visual</h1>
+    <p class="pagina-descricao">Tokens e componentes do app. Todos os valores desta página são fictícios.</p>
+  </div>
+</header>
+
+<section class="secao" aria-labelledby="sec-superficies">
+  <h2 class="secao-titulo" id="sec-superficies">Superfícies e texto</h2>
+  <div class="amostras">
+    {% for var, nome in superficies %}
+    <div><div class="amostra-cor" style="--c: var({{ var }})"></div><p class="amostra-nome">{{ nome }} <code>{{ var }}</code></p></div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-dados">
+  <h2 class="secao-titulo" id="sec-dados">Cores de dados</h2>
+  <p class="texto-2" style="margin-bottom: 16px">Únicas cores vivas do app: só em gráficos, marcadores e indicadores. Entradas = série 3, saídas = série 8, patrimônio = série 1.</p>
+  <div class="amostras">
+    {% for var, nome in cores_dados %}
+    <div><div class="amostra-cor" style="--c: var({{ var }})"></div><p class="amostra-nome">{{ nome }} <code>{{ var }}</code></p></div>
+    {% endfor %}
+  </div>
+  <h3 class="fs-16 peso-600" style="margin: 24px 0 12px">Estados <span class="texto-3 fs-13">(sempre com ícone e rótulo)</span></h3>
+  <div class="linha">
+    {{ badge("Dentro do orçamento", estado="ok") }}
+    {{ badge("80% do orçamento", estado="atencao") }}
+    {{ badge("Acima da meta", estado="alerta") }}
+    {{ badge("Orçamento estourado", estado="critico") }}
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-tipografia">
+  <h2 class="secao-titulo" id="sec-tipografia">Tipografia</h2>
+  <div class="card pilha">
+    {% for tamanho in tamanhos %}
+    <p class="fs-{{ tamanho }}{% if tamanho >= 28 %} peso-600{% endif %}">
+      <span class="texto-3 fs-12 tabular" style="display:inline-block; width: 48px">{{ tamanho }}px</span>
+      {% if tamanho >= 28 %}R$ 49.210,00{% else %}Inter — controle financeiro com clareza{% endif %}
+    </p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-kpis">
+  <h2 class="secao-titulo" id="sec-kpis">KPIs e variações</h2>
+  <div class="grade">
+    <div class="col-3">{{ kpi("Entradas", 812000|brl, cor="entrada", variacao_pct=variacao_baixa, detalhe="vs. setembro") }}</div>
+    <div class="col-3">{{ kpi("Saídas", 598870|brl, cor="saida", variacao_pct=variacao_baixa, bom_quando="baixa", detalhe="vs. setembro") }}</div>
+    <div class="col-3">{{ kpi("Saldo do mês", 213130|brl(sinal=True), detalhe="26% da renda") }}</div>
+    <div class="col-3">{{ kpi("Patrimônio", 4921000|brl, cor="patrimonio", variacao_pct=variacao_alta) }}</div>
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-graficos">
+  <h2 class="secao-titulo" id="sec-graficos">Gráficos</h2>
+  <div class="grade">
+    <div class="col-6">
+      {% call card("Entradas e saídas", "Últimos 6 meses") %}
+        {{ grafico("grafico-fluxo", "barras", fluxo, "Entradas e saídas nos últimos 6 meses") }}
+      {% endcall %}
+    </div>
+    <div class="col-6">
+      {% call card("Patrimônio", "Últimos 6 meses") %}
+        {{ grafico("grafico-patrimonio", "linha", patrimonio, "Evolução do patrimônio nos últimos 6 meses") }}
+      {% endcall %}
+    </div>
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-botoes">
+  <h2 class="secao-titulo" id="sec-botoes">Botões</h2>
+  <div class="card linha">
+    <button type="button" class="botao botao-primario">{{ icone("plus") }}Primário</button>
+    <button type="button" class="botao botao-secundario">Secundário</button>
+    <button type="button" class="botao botao-ghost">Ghost</button>
+    <button type="button" class="botao botao-ghost botao-icone" aria-label="Editar" data-dica="Editar">{{ icone("pencil") }}</button>
+    <button type="button" class="botao botao-secundario botao-pequeno">Pequeno</button>
+    <button type="button" class="botao botao-primario" disabled>Desabilitado</button>
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-formularios">
+  <h2 class="secao-titulo" id="sec-formularios">Formulários</h2>
+  <div class="card">
+    <div class="grade">
+      <div class="col-4">{{ campo("Descrição", "descricao", placeholder="Ex.: Mercado") }}</div>
+      <div class="col-4">{{ campo_moeda("Valor", "valor", 123456, ajuda="Digite só os números; a vírgula entra sozinha.") }}</div>
+      <div class="col-4">{{ campo("Data", "data", tipo="date", valor="2026-10-26") }}</div>
+      <div class="col-4">{{ campo_select("Conta", "conta", [("1", "Nubank"), ("2", "Carteira")], selecionado="1") }}</div>
+      <div class="col-4">{{ campo_moeda("Valor com erro", "valor_erro", erro="Informe um valor maior que zero.") }}</div>
+      <div class="col-4">{{ campo("Observação", "observacao", ajuda="Opcional.") }}</div>
+    </div>
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-tabela">
+  <h2 class="secao-titulo" id="sec-tabela">Tabela e badges</h2>
+  <div class="card">
+    <div class="tabela-container">
+      <table class="tabela">
+        <thead>
+          <tr><th scope="col">Data</th><th scope="col">Descrição</th><th scope="col">Categoria</th><th scope="col" class="num">Valor</th></tr>
+        </thead>
+        <tbody>
+          {% for lancamento in lancamentos %}
+          <tr>
+            <td class="secundario">{{ lancamento.data }}</td>
+            <td>{{ lancamento.descricao }}</td>
+            <td>{{ badge(lancamento.categoria, slot=lancamento.slot) }}</td>
+            <td class="num">
+              <span class="marcador {{ 'cor-entrada' if lancamento.valor > 0 else 'cor-saida' }}" aria-hidden="true"></span>
+              {{ lancamento.valor|brl(sinal=True) }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-sobreposicoes">
+  <h2 class="secao-titulo" id="sec-sobreposicoes">Drawer, modal, toast e dica</h2>
+  <div class="card linha">
+    <button type="button" class="botao botao-secundario" hx-get="/lancamentos/novo" hx-target="#drawer-conteudo">Abrir drawer</button>
+    <button type="button" class="botao botao-secundario" hx-post="/design/toast" hx-swap="none"
+            hx-confirm="Excluir o lançamento “Mercado” de R$ 387,90?">Modal de confirmação → toast com Desfazer</button>
+    <button type="button" class="botao botao-secundario" data-toast="Não foi possível salvar. Tente de novo." data-toast-tipo="erro">Toast de erro</button>
+    <span class="botao botao-ghost" tabindex="0" data-dica="Dica com informação extra">Passe o mouse aqui</span>
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-estados">
+  <h2 class="secao-titulo" id="sec-estados">Estado vazio e carregando</h2>
+  <div class="grade">
+    <div class="col-6">
+      {% call card() %}
+        {% call estado_vazio("Nenhum lançamento neste mês", "Lance uma despesa ou entrada para ver os gráficos.") %}
+          <button type="button" class="botao botao-primario" data-atalho-clique="novo">{{ icone("plus") }}Novo lançamento</button>
+        {% endcall %}
+      {% endcall %}
+    </div>
+    <div class="col-6">
+      {% call card() %}{{ skeleton(4) }}{% endcall %}
+    </div>
+  </div>
+</section>
+
+<section class="secao" aria-labelledby="sec-atalhos">
+  <h2 class="secao-titulo" id="sec-atalhos">Atalhos de teclado</h2>
+  <div class="card">
+    <table class="tabela">
+      <tbody>
+        <tr><th scope="row"><kbd>N</kbd></th><td>Novo lançamento</td></tr>
+        <tr><th scope="row"><kbd>←</kbd> <kbd>→</kbd></th><td>Mês anterior / próximo (nas páginas com seletor de mês)</td></tr>
+        <tr><th scope="row"><kbd>Ctrl</kbd> <kbd>K</kbd></th><td>Buscar / ir para uma página</td></tr>
+        <tr><th scope="row"><kbd>Esc</kbd></th><td>Fechar drawer, modal ou busca</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,19 @@
+{%- if erro %}
+<p class="campo-erro">{{ icone("circle-alert") }}{{ erro }}</p>
+{%- elif not sugestoes %}
+<p class="texto-2">{{ "Defina a alocação-alvo para saber onde aportar." if not tem_metas else "Nada a sugerir com esse valor." }}</p>
+{%- else %}
+<ul class="barras-lista resultado-aporte" aria-label="Sugestão de divisão do aporte de {{ valor|brl }}">
+  {% for s in sugestoes %}
+  <li>
+    <div class="barras-linha">
+      <span class="marcador slot-{{ s.slot }}" aria-hidden="true"></span>
+      <span class="barras-nome">{{ s.destino }} <span class="texto-3">· {{ s.motivo }}</span></span>
+      <span class="tabular peso-500">{{ s.valor|brl }}</span>
+    </div>
+    <div class="barra" aria-hidden="true"><span class="barra-preenchida slot-{{ s.slot }}" style="width: {{ (s.valor * 100 / valor)|round(1) }}%"></span></div>
+  </li>
+  {% endfor %}
+</ul>
+<p class="campo-ajuda assistente-nota">Divisão por classe, sem escolher ativos. Com pouco valor por classe, some o aporte de 2 a 3 meses antes de comprar, para os custos não pesarem.</p>
+{%- endif %}

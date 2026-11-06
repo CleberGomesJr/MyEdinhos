@@ -1,0 +1,39 @@
+{% extends "pages/assistente_base.html" %}
+{% from "components/ui.html" import campo_moeda, estado_vazio %}
+
+{% block passo %}
+<form method="post" action="/assistente/contas" class="pilha" novalidate>
+  <section class="card">
+    <header class="card-cabecalho">
+      <div>
+        <h2 class="card-titulo">Quanto há em cada conta hoje?</h2>
+        <p class="card-subtitulo">O saldo que aparece agora no app do banco. Para saldo negativo, comece com “-”.</p>
+      </div>
+      <button type="button" class="botao botao-secundario botao-pequeno" hx-get="/contas/nova" hx-target="#drawer-conteudo">{{ icone("plus") }}Nova conta</button>
+    </header>
+
+    <div id="lista" hx-disinherit="*" hx-get="/assistente/contas" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML">
+      {% if contas %}
+      <div class="assistente-campos">
+        {% for conta in contas %}
+        {{ campo_moeda(conta.nome, "saldo-" ~ conta.id, texto=valores.get("saldo-" ~ conta.id, ""), negativo=True,
+                       ajuda=conta.tipo.rotulo, erro=erros.get("saldo-" ~ conta.id)) }}
+        {% endfor %}
+      </div>
+      <p class="campo-ajuda assistente-nota">
+        O saldo passa a valer a partir de hoje. Se a conta já tiver lançamentos, eles continuam movendo o saldo
+        e só o valor inicial é corrigido.
+      </p>
+      {% else %}
+        {{ estado_vazio("Nenhuma conta ativa", "Cadastre a conta onde o seu dinheiro fica.", "wallet") }}
+      {% endif %}
+    </div>
+  </section>
+
+  <footer class="assistente-rodape">
+    <span class="espaco"></span>
+    <a class="botao botao-ghost" href="/assistente/cartoes">Pular</a>
+    <button type="submit" class="botao botao-primario">Salvar e continuar{{ icone("chevron-right") }}</button>
+  </footer>
+</form>
+{% endblock %}

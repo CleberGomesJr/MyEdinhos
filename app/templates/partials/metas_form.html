@@ -1,0 +1,33 @@
+<form class="drawer-form" hx-post="/analise/alocacao/metas" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">Alocação-alvo</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+  <div class="drawer-corpo pilha">
+    <p class="texto-2">Quanto de cada classe na carteira (os alvos somam 100%) e quanto pode desviar antes de virar alerta.</p>
+    <div class="tabela-container">
+      <table class="tabela tabela-form">
+        <thead><tr><th scope="col">Classe</th><th scope="col">Alvo %</th><th scope="col">± pp</th></tr></thead>
+        <tbody>
+          {% for grupo in grupos %}
+          {%- set alvo, tol = "alvo-" ~ grupo.value, "tolerancia-" ~ grupo.value %}
+          <tr>
+            <th scope="row"><span class="linha-nome"><span class="marcador slot-{{ grupo.cor_slot }}" aria-hidden="true"></span>{{ grupo.rotulo }}</span></th>
+            <td><input class="entrada entrada-curta" name="{{ alvo }}" value="{{ valores.get(alvo, '') }}" inputmode="decimal" aria-label="Alvo de {{ grupo.rotulo }}"
+                       data-sugestao="{{ sugestao[grupo][0] }}"{% if erros.get(alvo) %} aria-invalid="true"{% endif %}></td>
+            <td><input class="entrada entrada-curta" name="{{ tol }}" value="{{ valores.get(tol, '') }}" inputmode="decimal" aria-label="Tolerância de {{ grupo.rotulo }}"
+                       data-sugestao="{{ sugestao[grupo][1] }}"{% if erros.get(tol) %} aria-invalid="true"{% endif %}></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {%- for campo, msg in erros.items() %}<p class="campo-erro">{{ icone("circle-alert") }}{{ msg }}</p>{% endfor %}
+    <button type="button" class="botao botao-secundario botao-pequeno" data-preencher-sugestao>{{ icone("sparkles") }}Usar a sugestão do perfil moderado (45 / 27 / 20 / 8)</button>
+    <p class="campo-ajuda">Renda fixa inclui a reserva de emergência. Cripto e outros com alvo 0: a tolerância funciona como teto.</p>
+  </div>
+  <footer class="drawer-rodape">
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

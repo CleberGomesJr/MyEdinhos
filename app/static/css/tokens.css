@@ -1,0 +1,66 @@
+/* Tokens do design system — fonte da verdade: vault "04 - Design System".
+   Interface preto e branco; cor só para dados. Não criar cores fora daqui. */
+:root {
+  color-scheme: dark;
+
+  /* Superfícies (monocromáticas) */
+  --bg:         #0a0a0a;   /* fundo da página */
+  --surface-1:  #121212;   /* cards, sidebar */
+  --surface-2:  #1a1a1a;   /* hover, inputs */
+  --surface-3:  #232323;   /* selecionado, menus abertos */
+  --border:     rgba(255,255,255,.08);
+  --border-strong: rgba(255,255,255,.16);
+
+  /* Texto */
+  --text:       #fafafa;   /* principal */
+  --text-2:     #a3a3a3;   /* secundário */
+  --text-3:     #8a8a8a;   /* auxiliar (≥ 4.5:1 sobre surface-1) */
+
+  /* Ação primária = branco sobre preto, sem cor de marca */
+  --accent:     #fafafa;
+  --on-accent:  #0a0a0a;
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px #fafafa;
+
+  /* Forma e movimento */
+  --radius-sm: 6px;  --radius: 10px;  --radius-lg: 14px;
+  --space: 4px;                       /* grade de 4 */
+  --ease: 140ms cubic-bezier(.2,.8,.2,1);
+
+  /* ───────── Dados (únicas cores vivas) ───────── */
+  /* Categórica: ordem fixa, validada para fundo escuro */
+  --s1: #3987e5;  /* azul     */
+  --s2: #d95926;  /* laranja  */
+  --s3: #199e70;  /* aqua     */
+  --s4: #c98500;  /* amarelo  */
+  --s5: #d55181;  /* magenta  */
+  --s6: #008300;  /* verde    */
+  --s7: #9085e9;  /* violeta  */
+  --s8: #e66767;  /* vermelho */
+  --s-outros: #5c5c5c;  /* "Outros" / cinza neutro */
+
+  /* Papéis fixos no domínio financeiro */
+  --entrada: var(--s3);   /* #199e70 */
+  --saida:   var(--s8);   /* #e66767 */
+  --patrimonio: var(--s1);
+
+  /* Estado (reservado; sempre com ícone + texto) */
+  --ok:      #0ca30c;
+  --atencao: #fab219;
+  --alerta:  #ec835a;
+  --critico: #d03b3b;
+
+  /* Gráficos */
+  --grid:  rgba(255,255,255,.06);
+  --axis:  #383835;
+
+  /* ───────── Tipografia (E1-02) ───────── */
+  --fonte: "Inter", system-ui, "Segoe UI", sans-serif;
+  --fs-12: 12px;  --fs-13: 13px;  --fs-14: 14px;  --fs-16: 16px;
+  --fs-20: 20px;  --fs-28: 28px;  --fs-36: 36px;
+
+  /* ───────── Layout (E1-03) ───────── */
+  --sidebar: 240px;
+  --sidebar-recolhida: 64px;
+  --topbar: 56px;
+  --conteudo-max: 1280px;
+}

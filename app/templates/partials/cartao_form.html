@@ -1,0 +1,42 @@
+{% from "components/ui.html" import campo, campo_moeda, campo_select %}
+<form class="drawer-form" hx-post="{{ '/cartoes/' ~ cartao.id if cartao else '/cartoes' }}" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">{{ "Editar cartão" if cartao else "Novo cartão" }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    {{ campo("Nome", "nome", valor=valores.nome, erro=erros.nome, maxlength=60, autocomplete="off", autofocus=True,
+             placeholder="Ex.: Nubank") }}
+    <div class="grade-2">
+      {{ campo_moeda("Limite", "limite", texto=valores.limite, erro=erros.limite) }}
+      {{ campo("Bandeira", "bandeira", valor=valores.bandeira, erro=erros.bandeira, maxlength=30, autocomplete="off",
+               ajuda="Opcional.") }}
+    </div>
+    <div class="grade-2">
+      {{ campo("Dia do fechamento", "dia_fechamento", tipo="number", valor=valores.dia_fechamento,
+               erro=erros.dia_fechamento, min=1, max=31) }}
+      {{ campo("Dia do vencimento", "dia_vencimento", tipo="number", valor=valores.dia_vencimento,
+               erro=erros.dia_vencimento, min=1, max=31) }}
+    </div>
+    {{ campo_select("Compra feita no dia do fechamento", "compra_no_fechamento", regras, valores.compra_no_fechamento,
+                    erro=erros.compra_no_fechamento) }}
+    {{ campo_select("Conta que paga a fatura", "conta_pagamento_id", contas, valores.conta_pagamento_id,
+                    erro=erros.conta_pagamento_id) }}
+    <p class="campo-ajuda">
+      A fatura é identificada pelo mês do vencimento. Se o vencimento vier antes do fechamento no calendário,
+      ela vence no mês seguinte ao fechamento. Mudar os dias recoloca as compras já lançadas na fatura certa.
+    </p>
+  </div>
+
+  <footer class="drawer-rodape">
+    {% if cartao %}
+    <button type="button" class="botao botao-ghost" hx-post="/cartoes/{{ cartao.id }}/arquivar"
+            hx-confirm="Arquivar “{{ cartao.nome }}”? Ele some das listas e do lançamento, mas as faturas e compras ficam."
+            data-confirmar-titulo="Arquivar cartão" data-confirmar-acao="Arquivar">{{ icone("archive") }}Arquivar</button>
+    <span class="espaco"></span>
+    {% endif %}
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

@@ -1,0 +1,38 @@
+{#- Partes comuns dos assistentes de importação (E2-13, E4-11). -#}
+
+{% macro passos_importacao(passos, indice, rotulo) -%}
+<nav aria-label="{{ rotulo }}">
+  <ol class="passos">
+    {% for nome in passos %}
+    <li class="passo{% if loop.index0 == indice %} passo-atual{% endif %}">
+      <span class="passo-corpo"{% if loop.index0 == indice %} aria-current="step"{% endif %}>
+        <span class="passo-numero" aria-hidden="true">{% if loop.index0 < indice %}{{ icone("check") }}{% else %}{{ loop.index }}{% endif %}</span>
+        <span>{{ nome }}</span>
+      </span>
+    </li>
+    {% endfor %}
+  </ol>
+</nav>
+{%- endmacro %}
+
+{% macro aviso_erro(mensagem) -%}
+{% if mensagem %}<p class="aviso aviso-critico" role="alert">{{ icone("circle-alert") }}<span>{{ mensagem }}</span></p>{% endif %}
+{%- endmacro %}
+
+{% macro amostra_arquivo(tabela, amostra) -%}
+<div class="tabela-container">
+  <table class="tabela">
+    <caption class="sr-only">Primeiras linhas do arquivo</caption>
+    <thead><tr>{% for coluna in tabela.cabecalho %}<th scope="col">{{ coluna or "—" }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for linha in amostra %}
+      <tr>{% for celula in linha %}<td class="secundario">{{ celula }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{%- endmacro %}
+
+{% macro marcar_todas() -%}
+<label class="checkbox"><input type="checkbox" data-marcar-todas aria-label="Marcar ou desmarcar todas as linhas"></label>
+{%- endmacro %}

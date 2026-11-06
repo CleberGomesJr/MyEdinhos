@@ -1,0 +1,54 @@
+{% extends "pages/analise_base.html" %}
+{% from "components/ui.html" import badge, card, campo_moeda, estado_vazio %}
+
+{% block acoes %}
+<button type="button" class="botao botao-secundario" hx-get="/analise/alocacao/metas" hx-target="#drawer-conteudo">{{ icone("pencil") }}Editar alocação-alvo</button>
+{% endblock %}
+
+{% block secao %}
+<div id="lista" hx-disinherit="*" hx-get="{{ request.url }}" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {#- E6-03 -#}
+  {% call card("Alocação atual × alvo", "Carteira + contas marcadas como reserva de emergência (que contam como renda fixa): " ~ situacao.total|brl) %}
+  {% if not situacao.tem_metas %}
+    {% call estado_vazio("Sem alocação-alvo", "Defina quanto quer em cada classe. Há uma sugestão pronta para o perfil moderado.", "chart-pie") %}
+      <button type="button" class="botao botao-primario botao-pequeno" hx-get="/analise/alocacao/metas" hx-target="#drawer-conteudo">Definir alocação</button>
+    {% endcall %}
+  {% else %}
+  <div class="tabela-container">
+    <table class="tabela">
+      <caption class="sr-only">Alocação atual e alvo por classe</caption>
+      <thead>
+        <tr><th scope="col">Classe</th><th scope="col" class="num">Valor</th><th scope="col" class="num">Atual</th>
+            <th scope="col" class="num">Alvo</th><th scope="col" class="num ocultar-celular">Desvio</th><th scope="col">Situação</th></tr>
+      </thead>
+      <tbody>
+        {% for linha in situacao.linhas %}
+        <tr>
+          <td><span class="linha-nome"><span class="marcador slot-{{ linha.grupo.cor_slot }}" aria-hidden="true"></span>{{ linha.grupo.rotulo }}</span></td>
+          <td class="num">{{ linha.valor|brl }}</td>
+          <td class="num">{{ linha.percentual|pct }}</td>
+          <td class="num secundario">{{ linha.alvo|pct(casas=0) }} <span class="texto-3">± {{ linha.tolerancia|qtd }}</span></td>
+          <td class="num secundario ocultar-celular">{{ linha.desvio|pp }}</td>
+          <td>
+            {%- if linha.estado == "dentro" %}{{ badge("Dentro", estado="ok") }}
+            {%- elif linha.estado == "acima" %}{{ badge("Acima", estado="atencao") }}
+            {%- else %}{{ badge("Abaixo", estado="atencao") }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% endcall %}
+
+  {#- E6-04 -#}
+  {% call card("Onde colocar o aporte", "Primeiro a reserva (se a regra estiver ligada); depois as classes abaixo do alvo, sem vender nada") %}
+  <form class="linha formulario-aporte" hx-get="/analise/alocacao/aporte" hx-target="#resultado-aporte" hx-swap="innerHTML">
+    {{ campo_moeda("Quanto vai aportar", "valor", texto=aporte_padrao, id="campo-aporte") }}
+    <button type="submit" class="botao botao-primario">Calcular</button>
+  </form>
+  <div id="resultado-aporte" aria-live="polite"></div>
+  {% endcall %}
+</div>
+{% endblock %}

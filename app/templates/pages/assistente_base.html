@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titulo %}Cadastro inicial · MyEdinhos{% endblock %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Cadastro inicial</h1>
+    <p class="pagina-descricao">Informe como as coisas estão hoje, sem lançar o histórico. Dá para pular qualquer passo e voltar depois pela busca (Ctrl+K → “Cadastro inicial”).</p>
+  </div>
+</header>
+
+<nav aria-label="Passos do cadastro inicial">
+  <ol class="passos">
+    {% for item in passos %}
+    <li class="passo{% if loop.index0 == indice %} passo-atual{% elif loop.index0 < indice %} passo-feito{% endif %}">
+      <a href="{{ item.href }}"{% if loop.index0 == indice %} aria-current="step"{% endif %}>
+        <span class="passo-numero" aria-hidden="true">{% if loop.index0 < indice %}{{ icone("check") }}{% else %}{{ loop.index }}{% endif %}</span>
+        <span>{{ item.rotulo }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ol>
+</nav>
+
+{% block passo %}{% endblock %}
+{% endblock %}

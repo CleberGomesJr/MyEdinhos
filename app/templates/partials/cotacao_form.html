@@ -1,0 +1,20 @@
+{% from "components/ui.html" import campo %}
+<form class="drawer-form" hx-post="/carteira/ativos/{{ ativo.id }}/cotacao" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">Cotação de {{ ativo.ticker }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+  <div class="drawer-corpo pilha">
+    <div class="grade-2">
+      {{ campo("Preço por unidade (R$)", "preco", valor=valores.preco or "", erro=erros.preco, inputmode="decimal",
+               autocomplete="off", autofocus=True, placeholder="0,00") }}
+      {{ campo("Data", "data", tipo="date", valor=valores.data, erro=erros.data) }}
+    </div>
+    <p class="campo-ajuda">Para fundos, previdência e o que não tem cotação automática. Ações, FIIs, ETFs, BDRs e cripto
+      são atualizados pelas fontes de mercado (que substituem o valor manual do mesmo dia).</p>
+  </div>
+  <footer class="drawer-rodape">
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

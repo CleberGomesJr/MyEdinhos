@@ -1,0 +1,196 @@
+{#- Componentes reutilizáveis. Uso: {% from "components/ui.html" import kpi, card %} -#}
+
+{% macro card(titulo=None, subtitulo=None, classe="") -%}
+<section class="card {{ classe }}">
+  {%- if titulo %}
+  <header class="card-cabecalho">
+    <div>
+      <h2 class="card-titulo">{{ titulo }}</h2>
+      {%- if subtitulo %}<p class="card-subtitulo">{{ subtitulo }}</p>{% endif %}
+    </div>
+  </header>
+  {%- endif %}
+  {{ caller() if caller }}
+</section>
+{%- endmacro %}
+
+{#- Variação percentual: sempre sinal + seta + cor. `bom_quando` = "alta" ou "baixa". -#}
+{% macro variacao(valor, bom_quando="alta") -%}
+{%- if valor == 0 -%}
+<span class="variacao variacao-neutra">{{ valor|pct }}<span class="sr-only"> (estável)</span></span>
+{%- else -%}
+{%- set alta = valor > 0 -%}
+<span class="variacao variacao-{{ 'boa' if alta == (bom_quando == 'alta') else 'ruim' }}">
+  <span aria-hidden="true">{{ "▲" if alta else "▼" }}</span> {{ valor|pct(sinal=True) }}
+  <span class="sr-only">{{ "(alta)" if alta else "(queda)" }}</span>
+</span>
+{%- endif -%}
+{%- endmacro %}
+
+{#- `cor`: papel do dado (entrada, saida, patrimonio) para o marcador ao lado do rótulo. -#}
+{% macro kpi(rotulo, valor, cor=None, variacao_pct=None, bom_quando="alta", detalhe=None) -%}
+<div class="card kpi">
+  <p class="kpi-rotulo">
+    {%- if cor %}<span class="marcador cor-{{ cor }}" aria-hidden="true"></span>{% endif %}{{ rotulo }}
+  </p>
+  <p class="kpi-valor">{{ valor }}</p>
+  {%- if variacao_pct is not none or detalhe %}
+  <p class="kpi-rodape">
+    {%- if variacao_pct is not none %}{{ variacao(variacao_pct, bom_quando) }}{% endif %}
+    {%- if detalhe %}<span>{{ detalhe }}</span>{% endif %}
+  </p>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{#- `slot`: 1–8 da paleta categórica; `estado`: ok, atencao, alerta, critico (com ícone). -#}
+{% macro badge(texto, slot=None, cor=None, estado=None) -%}
+{%- set icones = {"ok": "circle-check", "atencao": "triangle-alert", "alerta": "circle-alert", "critico": "octagon-alert"} -%}
+<span class="badge{% if estado %} badge-estado-{{ estado }}{% endif %}">
+  {%- if slot is not none %}<span class="marcador slot-{{ slot }}" aria-hidden="true"></span>
+  {%- elif cor %}<span class="marcador cor-{{ cor }}" aria-hidden="true"></span>{% endif %}
+  {%- if estado %}{{ icone(icones[estado]) }}{% endif %}{{ texto }}</span>
+{%- endmacro %}
+
+{% macro estado_vazio(titulo, texto=None, icone_nome="inbox") -%}
+<div class="vazio">
+  {{ icone(icone_nome) }}
+  <h2 class="vazio-titulo">{{ titulo }}</h2>
+  {%- if texto %}<p class="vazio-texto">{{ texto }}</p>{% endif %}
+  {%- if caller %}<div class="vazio-acoes">{{ caller() }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro skeleton(linhas=3) -%}
+<div role="status" aria-label="Carregando">
+  <span class="skeleton skeleton-titulo"></span>
+  {%- for _ in range(linhas) %}<span class="skeleton"></span>{% endfor %}
+</div>
+{%- endmacro %}
+
+{#- Campos de formulário. Atributos extras (placeholder, required…) vão como kwargs. -#}
+{% macro _ajuda(campo_id, ajuda, erro) -%}
+{%- if erro %}<p class="campo-erro" id="{{ campo_id }}-ajuda">{{ icone("circle-alert") }}{{ erro }}</p>
+{%- elif ajuda %}<p class="campo-ajuda" id="{{ campo_id }}-ajuda">{{ ajuda }}</p>{% endif %}
+{%- endmacro %}
+
+{% macro _aria(campo_id, ajuda, erro) -%}
+{% if erro %} aria-invalid="true"{% endif %}{% if ajuda or erro %} aria-describedby="{{ campo_id }}-ajuda"{% endif %}
+{%- endmacro %}
+
+{% macro campo(rotulo, nome, tipo="text", valor="", ajuda=None, erro=None, id=None) -%}
+{%- set campo_id = id or "campo-" ~ nome -%}
+<div class="campo">
+  <label class="campo-rotulo" for="{{ campo_id }}">{{ rotulo }}</label>
+  <input class="entrada" type="{{ tipo }}" id="{{ campo_id }}" name="{{ nome }}" value="{{ valor }}"
+    {{- _aria(campo_id, ajuda, erro) }}{{ kwargs|xmlattr }}>
+  {{ _ajuda(campo_id, ajuda, erro) }}
+</div>
+{%- endmacro %}
+
+{#- Valor em reais: o servidor lê o texto com `centavos_de_texto`; o JS só formata.
+    `texto` reexibe o que foi digitado (após erro); `negativo` permite sinal de menos. -#}
+{% macro campo_moeda(rotulo, nome, centavos=None, texto=None, negativo=False, ajuda=None, erro=None, id=None) -%}
+{%- set campo_id = id or "campo-" ~ nome -%}
+{%- set valor = texto if texto is not none else (centavos|valor_br if centavos is not none else "") -%}
+<div class="campo">
+  <label class="campo-rotulo" for="{{ campo_id }}">{{ rotulo }}</label>
+  <div class="entrada-moeda">
+    <span class="entrada-moeda-prefixo" aria-hidden="true">R$</span>
+    <input class="entrada" type="text" inputmode="{{ 'text' if negativo else 'numeric' }}" autocomplete="off"
+      data-moeda="{{ 'negativo' if negativo else '' }}"
+      id="{{ campo_id }}" name="{{ nome }}" placeholder="0,00" value="{{ valor }}"
+      {{- _aria(campo_id, ajuda, erro) }}{{ kwargs|xmlattr }}>
+  </div>
+  {{ _ajuda(campo_id, ajuda, erro) }}
+</div>
+{%- endmacro %}
+
+{#- `opcoes`: lista de (valor, texto). -#}
+{% macro campo_select(rotulo, nome, opcoes, selecionado=None, ajuda=None, erro=None, id=None) -%}
+{%- set campo_id = id or "campo-" ~ nome -%}
+<div class="campo">
+  <label class="campo-rotulo" for="{{ campo_id }}">{{ rotulo }}</label>
+  <select class="entrada" id="{{ campo_id }}" name="{{ nome }}"
+    {{- _aria(campo_id, ajuda, erro) }}{{ kwargs|xmlattr }}>
+    {%- for valor, texto in opcoes %}
+    <option value="{{ valor }}"{% if valor|string == selecionado|string %} selected{% endif %}>{{ texto }}</option>
+    {%- endfor %}
+  </select>
+  {{ _ajuda(campo_id, ajuda, erro) }}
+</div>
+{%- endmacro %}
+
+{% macro campo_checkbox(rotulo, nome, marcado=False, ajuda=None, id=None) -%}
+{%- set campo_id = id or "campo-" ~ nome -%}
+<div class="campo">
+  <label class="checkbox" for="{{ campo_id }}">
+    <input type="checkbox" id="{{ campo_id }}" name="{{ nome }}" value="1"{% if marcado %} checked{% endif %}
+      {%- if ajuda %} aria-describedby="{{ campo_id }}-ajuda"{% endif %}{{ kwargs|xmlattr }}>
+    <span>{{ rotulo }}</span>
+  </label>
+  {%- if ajuda %}<p class="campo-ajuda" id="{{ campo_id }}-ajuda">{{ ajuda }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{#- Escolha única em botões lado a lado. `opcoes`: lista de (valor, rótulo, cor ou None);
+    a cor (papel do dado) aparece como marcador. -#}
+{% macro segmentado(rotulo, nome, opcoes, selecionado, erro=None, desabilitado=False) -%}
+<fieldset class="campo segmentado-campo"{% if desabilitado %} disabled{% endif %}>
+  <legend class="campo-rotulo">{{ rotulo }}</legend>
+  <div class="segmentado">
+    {%- for valor, texto, cor in opcoes %}
+    <input type="radio" class="sr-only" name="{{ nome }}" id="{{ nome }}-{{ valor }}" value="{{ valor }}"
+      {%- if valor|string == selecionado|string %} checked{% endif %}>
+    <label for="{{ nome }}-{{ valor }}">
+      {%- if cor %}<span class="marcador cor-{{ cor }}" aria-hidden="true"></span>{% endif %}{{ texto }}</label>
+    {%- endfor %}
+  </div>
+  {%- if erro %}<p class="campo-erro">{{ icone("circle-alert") }}{{ erro }}</p>{% endif %}
+</fieldset>
+{%- endmacro %}
+
+{#- Gráfico Chart.js + "ver como tabela". `dados`: {rotulos, formato, series: [{nome, cor, valores}]}.
+    `cor` é um papel: entrada, saida, patrimonio, s1…s8, outros. Requer o bloco de scripts de gráfico. -#}
+{% macro grafico(id, tipo, dados, titulo) -%}
+<figure class="grafico">
+  <div class="grafico-area">
+    <canvas id="{{ id }}" data-grafico="{{ tipo }}" data-dados="{{ id }}-dados" role="img" aria-label="{{ titulo }}"></canvas>
+  </div>
+  <script type="application/json" id="{{ id }}-dados">{{ dados|tojson }}</script>
+  <details class="grafico-tabela">
+    <summary>{{ icone("table") }}Ver como tabela</summary>
+    <div class="tabela-container">
+      <table class="tabela">
+        <caption class="sr-only">{{ titulo }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Período</th>
+            {%- for serie in dados.series %}<th scope="col" class="num">{{ serie.nome }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {%- for rotulo in dados.rotulos %}{% set linha = loop.index0 %}
+          <tr>
+            <th scope="row">{{ rotulo }}</th>
+            {%- for serie in dados.series %}
+            <td class="num">{{ serie.valores[linha]|brl if dados.formato == "brl" else serie.valores[linha] }}</td>
+            {%- endfor %}
+          </tr>
+          {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</figure>
+{%- endmacro %}
+
+{#- E3-14: base dos resumos. Links (não formulário): a escolha fica no cookie, como o mês. -#}
+{% macro alternar_visao(caixa) -%}
+<nav class="segmentado segmentado-pequeno" aria-label="Base dos resumos">
+  <a href="?visao=competencia"{% if not caixa %} aria-current="true"{% endif %}
+     title="Compras no cartão contam no mês em que foram feitas">Competência</a>
+  <a href="?visao=caixa"{% if caixa %} aria-current="true"{% endif %}
+     title="O que entrou e saiu das contas, pela data; a fatura conta quando é paga">Caixa</a>
+</nav>
+{%- endmacro %}

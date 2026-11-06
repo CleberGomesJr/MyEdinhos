@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import badge, campo_select, card, estado_vazio %}
+{% from "components/importacao.html" import amostra_arquivo, aviso_erro, marcar_todas, passos_importacao %}
+{% block titulo %}Importar extrato · MyEdinhos{% endblock %}
+
+{% block conteudo %}
+<header class="pagina-cabecalho">
+  <div>
+    <h1 class="pagina-titulo">Importar extrato</h1>
+    <p class="pagina-descricao">{% if origem and origem.nome %}{{ origem.nome }}. {% endif %}CSV ou OFX do banco. Nada entra sem você revisar, e importar o mesmo arquivo de novo não duplica.</p>
+  </div>
+  <div class="cabecalho-acoes"><a class="botao botao-ghost" href="/lancamentos">{{ icone("chevron-left") }}Lançamentos</a></div>
+</header>
+
+{{ passos_importacao(passos, indice, "Passos da importação") }}
+
+{% if etapa == "arquivo" %}
+<div id="lista" hx-disinherit="*" hx-get="/lancamentos/importar" hx-trigger="atualizar from:body" hx-select="#lista" hx-swap="outerHTML" class="pilha">
+  {{ aviso_erro(erro) }}
+  {% if origens %}
+  {% call card("Qual arquivo?", "O extrato ou a fatura que você baixou do banco") %}
+    <form method="post" action="/lancamentos/importar" enctype="multipart/form-data" class="pilha">
+      {{ campo_select("De qual conta ou cartão é este extrato?", "origem", origens, origem) }}
+      <div class="campo">
+        <label class="campo-rotulo" for="campo-arquivo">Arquivo .csv ou .ofx (até 5 MB)</label>
+        <input class="entrada" type="file" id="campo-arquivo" name="arquivo" accept=".csv,.ofx,.txt">
+        <p class="campo-ajuda">No app ou site do banco, procure por “exportar extrato” ou “baixar fatura”. O arquivo é lido só neste computador.</p>
+      </div>
+      <div class="linha"><button type="submit" class="botao botao-primario">Continuar{{ icone("chevron-right") }}</button></div>
+    </form>
+  {% endcall %}
+  {% else %}
+  <section class="card">
+    {% call estado_vazio("Sem conta ou cartão ativo", "Cadastre primeiro onde esse extrato deve entrar.", "wallet") %}
+      <a class="botao botao-primario" href="/contas">{{ icone("plus") }}Ir para Contas</a>
+    {% endcall %}
+  </section>
+  {% endif %}
+  {% if ultimo_lote %}
+  <p class="aviso">{{ icone("info") }}<span>A última importação criou {{ ultimo_lote }} lançamento(s).
+    <button type="button" class="botao botao-ghost botao-pequeno" hx-post="/lancamentos/importar/desfazer"
+            hx-confirm="Apagar os {{ ultimo_lote }} lançamento(s) da última importação?"
+            data-confirmar-titulo="Desfazer importação" data-confirmar-acao="Apagar">Desfazer</button></span></p>
+  {% endif %}
+</div>
+
+{% elif etapa == "colunas" %}
+<form method="post" action="/lancamentos/importar/revisar" class="pilha" novalidate>
+  <input type="hidden" name="origem" value="{{ origem.chave }}">
+  <input type="hidden" name="conteudo" value="{{ conteudo }}">
+  {{ aviso_erro(erro) }}
+  {% call card("O que é cada coluna?", "Já preenchi o que reconheci. Confira com as primeiras linhas abaixo.") %}
+    <div class="assistente-campos">
+      {{ campo_select("Data", "col_data", colunas, mapa.data) }}
+      {{ campo_select("Descrição", "col_descricao", colunas, mapa.descricao) }}
+      {{ campo_select("Valor", "col_valor", colunas, mapa.valor, ajuda="Uma coluna só, com sinal") }}
+      {{ campo_select("Crédito", "col_credito", colunas, mapa.credito, ajuda="Só se entradas e saídas vêm separadas") }}
+      {{ campo_select("Débito", "col_debito", colunas, mapa.debito, ajuda="Só se entradas e saídas vêm separadas") }}
+      {{ campo_select("Sinal do valor", "sinal", [("negativo", "Negativo é saída (extrato de conta)"), ("positivo", "Positivo é saída (fatura de cartão)")], "positivo" if mapa.positivo_e_saida else "negativo") }}
+    </div>
+  {% endcall %}
+  {% call card("Primeiras linhas do arquivo") %}
+    {{ amostra_arquivo(tabela, amostra) }}
+  {% endcall %}
+  <footer class="assistente-rodape">
+    <span class="espaco"></span>
+    <a class="botao botao-ghost" href="/lancamentos/importar">Trocar arquivo</a>
+    <button type="submit" class="botao botao-primario">Revisar{{ icone("chevron-right") }}</button>
+  </footer>
+</form>
+
+{% elif etapa == "revisao" %}
+<form method="post" action="/lancamentos/importar/confirmar" class="pilha" novalidate>
+  <input type="hidden" name="origem" value="{{ origem.chave }}">
+  <input type="hidden" name="conteudo" value="{{ conteudo }}">
+  {% if mapa %}
+  <input type="hidden" name="col_data" value="{{ mapa.data }}">
+  <input type="hidden" name="col_descricao" value="{{ mapa.descricao }}">
+  <input type="hidden" name="col_valor" value="{{ mapa.valor }}">
+  <input type="hidden" name="col_credito" value="{{ mapa.credito }}">
+  <input type="hidden" name="col_debito" value="{{ mapa.debito }}">
+  <input type="hidden" name="sinal" value="{{ 'positivo' if mapa.positivo_e_saida else 'negativo' }}">
+  {% endif %}
+  {{ aviso_erro(erro) }}
+  {% if erros_arquivo %}
+  <p class="aviso aviso-critico">{{ icone("circle-alert") }}<span>{{ erros_arquivo|length }} linha(s) não entendida(s) e deixada(s) de fora. No arquivo: linha {{ erros_arquivo.keys()|list|join(", ") }}.</span></p>
+  {% endif %}
+  {% if antes_do_saldo %}
+  <p class="aviso">{{ icone("info") }}<span>Há lançamentos anteriores a {{ origem.conta.data_saldo_inicial|data_br }}, data do saldo inicial da conta. Eles ficam no histórico, mas não mudam o saldo.</span></p>
+  {% endif %}
+  {% call card("Confira antes de importar", (marcadas ~ " de " ~ itens|length ~ " linha(s) marcada(s)") if itens else None) %}
+    {% if itens %}
+    <div class="tabela-container">
+      <table class="tabela tabela-importar tabela-importar-extrato">
+        <caption class="sr-only">Linhas do arquivo</caption>
+        <thead>
+          <tr>
+            <th scope="col" class="coluna-marca">{{ marcar_todas() }}</th>
+            <th scope="col">Data</th>
+            <th scope="col">Descrição</th>
+            <th scope="col" class="num">Valor</th>
+            <th scope="col">Categoria</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in itens %}
+          <tr{% if not item.importar %} class="linha-apagada"{% endif %}>
+            <td class="coluna-marca">
+              <label class="checkbox"><input type="checkbox" name="importar-{{ item.indice }}" value="1"{% if item.importar %} checked{% endif %}{% if item.situacao == "importada" %} disabled{% endif %} aria-label="Importar {{ item.transacao.descricao }}"></label>
+            </td>
+            <td class="secundario">{{ item.transacao.data|data_br }}</td>
+            <td>
+              {{ item.transacao.descricao }}
+              {%- if item.motivo %}<span class="linha-motivo">{{ item.motivo }}</span>{% endif %}
+            </td>
+            <td class="num">
+              <span class="marcador cor-{{ item.tipo }}" aria-hidden="true"></span>{{ item.transacao.valor|brl(sinal=True) }}
+            </td>
+            <td>
+              <select class="entrada entrada-compacta" name="categoria-{{ item.indice }}" aria-label="Categoria de {{ item.transacao.descricao }}">
+                {% for valor, texto in (categorias_entrada if item.tipo == "entrada" else categorias_saida) %}
+                <option value="{{ valor }}"{% if valor == item.categoria_id %} selected{% endif %}>{{ texto }}</option>
+                {% endfor %}
+              </select>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ estado_vazio("Nenhum lançamento no arquivo", "Confira se as colunas de data e valor estão certas.", "inbox") }}
+    {% endif %}
+  {% endcall %}
+  <footer class="assistente-rodape">
+    <span class="espaco"></span>
+    <a class="botao botao-ghost" href="/lancamentos/importar">Trocar arquivo</a>
+    {% if itens %}<button type="submit" class="botao botao-primario">Importar marcadas</button>{% endif %}
+  </footer>
+</form>
+
+{% else %}
+<section class="card">
+  {% if criados %}
+    {% call estado_vazio(criados ~ " lançamento(s) importado(s)", "Entraram em " ~ origem.nome ~ ". Se algo saiu errado, dá para desfazer tudo na tela de importação.", "circle-check") %}
+      <a class="botao botao-primario" href="/lancamentos{% if mes_importado %}?mes={{ mes_importado }}{% endif %}">Ver lançamentos</a>
+      <a class="botao botao-ghost" href="/lancamentos/importar">Importar outro</a>
+    {% endcall %}
+  {% else %}
+    {% call estado_vazio("Nada importado", "Nenhuma linha estava marcada.", "inbox") %}
+      <a class="botao botao-primario" href="/lancamentos/importar">Importar outro</a>
+    {% endcall %}
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

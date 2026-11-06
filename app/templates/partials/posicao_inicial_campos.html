@@ -1,0 +1,15 @@
+{#- Campos da posição inicial em lote (E4-15): usados no drawer da Carteira e no Cadastro inicial. -#}
+{% from "components/ui.html" import campo %}
+<p class="texto-2">O que você já tem, sem precisar do histórico de compras: um ativo por linha, com
+  <strong>código; quantidade; preço médio</strong> (o preço médio aparece na posição do app da corretora).</p>
+<div class="campo">
+  <label class="campo-rotulo" for="campo-linhas">Ativos</label>
+  <textarea class="entrada entrada-lote" id="campo-linhas" name="linhas" rows="8" spellcheck="false" autofocus
+            placeholder="ITSA4; 100; 9,50&#10;MXRF11; 300; 10,12&#10;BTC; 0,005; 300.000,00"
+            {%- if erros.linhas %} aria-invalid="true" aria-describedby="campo-linhas-ajuda"{% endif %}>{{ valores.linhas or "" }}</textarea>
+  {%- if erros.linhas %}<p class="campo-erro" id="campo-linhas-ajuda">{{ icone("circle-alert") }}{{ erros.linhas }}</p>{% endif %}
+</div>
+{{ campo("Data de referência", "data", tipo="date", valor=valores.data, erro=erros.data,
+         ajuda="O dia da posição informada. Compras e vendas depois dela entram como operações.") }}
+<p class="campo-ajuda">A classe é deduzida pelo código (final 11 = FII, 3 a 8 = ação, 34 = BDR, BTC/ETH = cripto) e pode ser
+  corrigida depois na página do ativo. Renda fixa e fundos: cadastre como ativo e lance a posição como “Posição inicial”.</p>

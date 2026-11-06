@@ -1,0 +1,69 @@
+{% from "components/ui.html" import campo, campo_moeda, campo_select %}
+<form class="drawer-form" hx-post="{{ '/carteira/operacoes/' ~ operacao.id if operacao else '/carteira/operacoes' }}" hx-target="#drawer-conteudo" novalidate>
+  {%- if valores.anuncio_id %}<input type="hidden" name="anuncio_id" value="{{ valores.anuncio_id }}">{% endif %}
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">{{ "Editar operação" if operacao else "Nova operação" }}</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+
+  <div class="drawer-corpo pilha">
+    {% if not ativos %}
+    <p class="aviso">{{ icone("info") }}<span>Cadastre um ativo primeiro (Carteira → Novo ativo ou Posição inicial).</span></p>
+    {% endif %}
+    {{ campo_select("Ativo", "ativo_id", [("", "Escolha…")] + ativos, valores.ativo_id, erro=erros.ativo_id, autofocus=None if valores.ativo_id else True) }}
+    <div class="grade-2">
+      {{ campo_select("Tipo", "tipo", tipos, valores.tipo, erro=erros.tipo) }}
+      {{ campo("Data", "data", tipo="date", valor=valores.data, erro=erros.data) }}
+    </div>
+
+    {#- Compra, venda e posição inicial: quantidade × preço (+/− taxas) -#}
+    <div class="pilha" data-mostrar-se="tipo=compra|venda|posicao_inicial">
+      <div class="grade-2">
+        {{ campo("Quantidade", "quantidade", valor=valores.quantidade or "", erro=erros.quantidade, inputmode="decimal",
+                 autocomplete="off", id="op-quantidade", autofocus=True if valores.ativo_id and not operacao else None) }}
+        {{ campo("Preço por unidade (R$)", "preco_unitario", valor=valores.preco_unitario or "", erro=erros.preco_unitario,
+                 inputmode="decimal", autocomplete="off", id="op-preco", placeholder="0,00") }}
+      </div>
+      <div data-mostrar-se="tipo=compra|venda">
+        {{ campo_moeda("Taxas", "taxas", texto=valores.taxas or "", erro=erros.taxas,
+                       ajuda="Corretagem e emolumentos. Na compra somam ao custo; na venda saem do valor recebido.") }}
+      </div>
+    </div>
+
+    {#- Proventos -#}
+    <div class="pilha" data-mostrar-se="tipo=dividendo|jcp|rendimento">
+      {{ campo_moeda("Valor recebido", "valor", texto=valores.valor or "", erro=erros.valor,
+                     ajuda="O líquido que caiu na conta (o JCP já vem com o IR retido: 17,5% desde 2026).") }}
+      {{ campo("Quantidade com direito", "quantidade", valor=valores.quantidade or "", erro=erros.quantidade, inputmode="decimal",
+               autocomplete="off", id="op-quantidade-provento", ajuda="Opcional.") }}
+    </div>
+
+    {#- Eventos -#}
+    <div data-mostrar-se="tipo=desdobramento">
+      {{ campo("Fator", "quantidade", valor=valores.quantidade or "", erro=erros.quantidade, inputmode="decimal", autocomplete="off",
+               id="op-fator", ajuda="Cada ação vira quantas: 2 em um desdobramento 1:2; 0,1 em um grupamento 10:1.") }}
+    </div>
+    <div class="grade-2" data-mostrar-se="tipo=bonificacao">
+      {{ campo("Ações recebidas", "quantidade", valor=valores.quantidade or "", erro=erros.quantidade, inputmode="decimal",
+               autocomplete="off", id="op-bonus") }}
+      {{ campo("Custo atribuído por ação (R$)", "preco_unitario", valor=valores.preco_unitario or "", erro=erros.preco_unitario,
+               inputmode="decimal", autocomplete="off", id="op-custo-bonus", ajuda="Informado pela empresa. Pode ser 0.") }}
+    </div>
+
+    <div data-mostrar-se="tipo=compra|venda|dividendo|jcp|rendimento">
+      {{ campo_select("Conta", "conta_id", contas, valores.conta_id, erro=erros.conta_id,
+                      ajuda="Opcional. Compra tira desta conta; venda e proventos põem nela.") }}
+    </div>
+    {{ campo("Observação", "observacao", valor=valores.observacao or "", erro=erros.observacao, maxlength=500, autocomplete="off") }}
+  </div>
+
+  <footer class="drawer-rodape">
+    {% if operacao %}
+    <button type="button" class="botao botao-ghost" hx-delete="/carteira/operacoes/{{ operacao.id }}"
+            hx-confirm="Excluir esta operação?" data-confirmar-titulo="Excluir operação" data-confirmar-acao="Excluir">{{ icone("trash-2") }}Excluir</button>
+    <span class="espaco"></span>
+    {% endif %}
+    <button type="submit" class="botao botao-primario ordem-ultima">Salvar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>

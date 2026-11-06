@@ -1,0 +1,14 @@
+{% from "components/ui.html" import campo %}
+<form class="drawer-form" hx-post="/carteira/posicao-inicial" hx-target="#drawer-conteudo" novalidate>
+  <header class="drawer-cabecalho">
+    <h2 class="drawer-titulo" id="drawer-titulo">Posição inicial</h2>
+    <button type="button" class="botao botao-ghost botao-icone" data-fechar aria-label="Fechar">{{ icone("x") }}</button>
+  </header>
+  <div class="drawer-corpo pilha">
+    {% include "partials/posicao_inicial_campos.html" %}
+  </div>
+  <footer class="drawer-rodape">
+    <button type="submit" class="botao botao-primario ordem-ultima">Registrar</button>
+    <button type="button" class="botao botao-secundario" data-fechar>Cancelar</button>
+  </footer>
+</form>
